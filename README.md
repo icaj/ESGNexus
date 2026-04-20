@@ -34,7 +34,7 @@ O sistema deverá permitir:
 
 ### Frontend
 
-Aplicação SPA/SSR com **Next.js**.
+Aplicação SPA com **Next.js**.
 
 Responsabilidades:
 
@@ -112,7 +112,6 @@ Responsabilidades:
 * Docker e Docker Compose
 * Nginx como reverse proxy
 * Linux Ubuntu Server ou Debian
-* GitHub Actions para CI/CD
 
 ---
 
@@ -807,12 +806,13 @@ MariaDB é uma ótima escolha se o objetivo for reduzir custo e manter compatibi
 
 ---
 
-## 18. Próximo passo recomendado
+## 18. Próximos passos
 
 Transformar esta especificação em:
 
-1. modelagem física do banco MySQL/MariaDB
-2. wireframes das telas
+1. Adaptação da modelagem física do banco MySQL/MariaDB aos novos requisitos dos dados entregues pelo CESAR
+2. Ajustar os wireframes das telas
 3. estrutura inicial do projeto Next.js + Spring Boot
 4. endpoints REST já implementados
 5. docker-compose para rodar em Linux
+6. GitHub Actions para CI/CD (a implementar)
