@@ -1,5 +1,5 @@
 # ESGNexus
-# ESG Nexus — Especificação técnica do software web
+# ESG Nexus — Especificação técnica do software
 
 ## 1. Visão geral
 
