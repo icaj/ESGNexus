@@ -1,0 +1,44 @@
+version: '3.9'
+services:
+  db:
+    image: mariadb:11
+    container_name: esg_nexus_db
+    restart: always
+    environment:
+      MARIADB_DATABASE: esg_nexus
+      MARIADB_USER: esg_user
+      MARIADB_PASSWORD: esg_pass
+      MARIADB_ROOT_PASSWORD: rootpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  backend:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: esg_nexus_backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: mvn spring-boot:run
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  frontend:
+    image: node:20
+    container_name: esg_nexus_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
