@@ -74,7 +74,7 @@ Responsabilidades:
 
 ---
 
-## 4. Stack tecnológica
+## 4. Arquitetura tecnológica
 
 ## 4.1 Frontend
 
@@ -372,7 +372,7 @@ Exemplo de pesos iniciais:
 
 ---
 
-## 7. Estrutura sugerida do banco de dados
+## 7. Estrutura do banco de dados
 
 ## 7.1 Tabelas principais
 
@@ -785,15 +785,15 @@ Serviços sugeridos:
 
 ### Deploy
 
-* Docker Compose em Linux Ubuntu Server
+* Docker Compose para Linux Ubuntu Server
 
 ### Observação
 
-MariaDB é uma ótima escolha se o objetivo for reduzir custo e manter compatibilidade MySQL.
+MariaDB foi escolhido para reduzir custo e manter compatibilidade.
 
 ---
 
-## 17. Diferenciais competitivos do produto
+## 17. Diferenciais competitivos
 
 * score ESG configurável
 * ranking comparativo por fornecedor
