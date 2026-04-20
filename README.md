@@ -75,7 +75,7 @@ Responsabilidades:
 
 ---
 
-## 4. Stack tecnológica sugerida
+## 4. Stack tecnológica
 
 ## 4.1 Frontend
 
@@ -296,7 +296,7 @@ Responsabilidades:
   * C: 60 a 74
   * D: abaixo de 60
 
-### Fórmula sugerida
+### Fórmula para cálculo de aderencia
 
 ```text
 Score Final = (Score Ambiental × Peso E) + (Score Social × Peso S) + (Score Governança × Peso G)
@@ -323,13 +323,13 @@ Exemplo de pesos iniciais:
 * certificações vencidas ou a vencer
 * evolução do score por período
 
-### Gráficos sugeridos
+### Gráficos
 
 * barras: top fornecedores
-* pizza/donut: distribuição por faixas
+* pizza: distribuição por faixas
 * linha: evolução do score
 * cards: KPIs principais
-* heatmap: aderência por critério
+* mapa de calor: aderência por critério
 
 ---
 
@@ -377,89 +377,89 @@ Exemplo de pesos iniciais:
 
 ## 7.1 Tabelas principais
 
-### users
+### usuario
 
 * id
-* name
+* nome
 * email
 * password_hash
-* role_id
-* active
-* created_at
-* updated_at
+* perfil_id
+* ativo
+* criado_em
+* atualizado_em
 
-### roles
-
-* id
-* name
-* description
-
-### suppliers
+### perfil
 
 * id
-* legal_name
-* trade_name
-* tax_id
+* nome
+* descricao
+
+### fornecedor
+
+* id
+* razaoSocial
+* nomeFantasia
+* cnpj
 * email
-* phone
-* contact_name
-* segment
-* category
-* country
-* state
-* city
-* risk_level
+* telefone
+* nomeContato
+* segmento
+* categoria
+* pais
+* estado
+* cidade
+* nivelRisco
 * status
-* created_at
-* updated_at
+* criado_em
+* atualizado_at
 
-### esg_dimensions
-
-* id
-* code (E, S, G)
-* name
-* weight
-
-### esg_criteria
+### dimensao_esg
 
 * id
-* dimension_id
-* name
-* description
-* max_score
-* required_flag
-* active
+* codigo (E, S, G)
+* nome
+* peso
 
-### supplier_assessments
+### criterio_esg
 
 * id
-* supplier_id
-* assessment_date
-* environmental_score
-* social_score
-* governance_score
-* final_score
-* ranking_position
-* notes
-* created_by
+* id_dimensao
+* nome
+* descricao
+* scoreMax
+* obrigatorio
+* ativo
 
-### supplier_assessment_items
+### avaliacao_fornecedor
 
 * id
-* assessment_id
-* criterion_id
+* id_fornecedor
+* data_avaliacao
+* score_ambiente
+* score_social
+* score_governanca
+* scoire_final
+* posicao_rank
+* observacoes
+* criado_por
+
+### item_avaliacao_fornecedor
+
+* id
+* id_avaliacao
+* id_criterio
 * score
-* evidence_url
-* comment
+* evidencia_url
+* commentario
 
-### certifications
+### certificacao
 
 * id
 * name
 * description
 * issuer
 
-### supplier_certifications
+### certificacao_fornecedor
 
 * id
 * supplier_id
@@ -469,7 +469,7 @@ Exemplo de pesos iniciais:
 * status
 * file_url
 
-### alerts
+### alerta
 
 * id
 * supplier_id
@@ -482,13 +482,13 @@ Exemplo de pesos iniciais:
 * created_at
 * resolved_at
 
-### settings
+### config
 
 * id
 * setting_key
 * setting_value
 
-### audit_logs
+### audit_log
 
 * id
 * user_id
@@ -503,20 +503,20 @@ Exemplo de pesos iniciais:
 ## 8. Modelo relacional resumido
 
 ```text
-roles 1---N users
-suppliers 1---N supplier_assessments
-supplier_assessments 1---N supplier_assessment_items
-esg_dimensions 1---N esg_criteria
-esg_criteria 1---N supplier_assessment_items
-suppliers 1---N supplier_certifications
-certifications 1---N supplier_certifications
-suppliers 1---N alerts
-users 1---N audit_logs
+perfil 1---N usuario
+fornecedor 1---N avaliacao_fornecedor
+avaliacao_fornecedor 1---N item_avaliacao_fornecedor
+dimensao_esg 1---N criterio_esg
+criterio_esg 1---N item_avaliacao_fornecedor
+fornecedor 1---N certificacao_fornecedor
+certifications 1---N certificacao_fornecedor
+fornecedor 1---N alerta
+usuario 1---N audit_log
 ```
 
 ---
 
-## 9. APIs REST sugeridas
+## 9. APIs REST
 
 ## 9.1 Autenticação
 
@@ -638,7 +638,7 @@ users 1---N audit_logs
 
 ---
 
-## 11. Estrutura sugerida de pastas
+## 11. Estrutura de pastas
 
 ## 11.1 Frontend Next.js
 
