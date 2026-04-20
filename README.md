@@ -1,4 +1,3 @@
-# ESGNexus
 # ESG Nexus — Especificação técnica do software
 
 ## 1. Visão geral
