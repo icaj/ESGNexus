@@ -382,7 +382,7 @@ Exemplo de pesos iniciais:
 * nome
 * email
 * password_hash
-* perfil_id
+* id_perfil
 * ativo
 * criado_em
 * atualizado_em
@@ -396,21 +396,21 @@ Exemplo de pesos iniciais:
 ### fornecedor
 
 * id
-* razaoSocial
-* nomeFantasia
+* razao_social
+* nome_fantasia
 * cnpj
 * email
 * telefone
-* nomeContato
+* nome_contato
 * segmento
 * categoria
 * pais
 * estado
 * cidade
-* nivelRisco
+* nivel_risco
 * status
 * criado_em
-* atualizado_at
+* atualizado_em
 
 ### dimensao_esg
 
@@ -425,7 +425,7 @@ Exemplo de pesos iniciais:
 * id_dimensao
 * nome
 * descricao
-* scoreMax
+* score_max
 * obrigatorio
 * ativo
 
@@ -454,48 +454,48 @@ Exemplo de pesos iniciais:
 ### certificacao
 
 * id
-* name
-* description
-* issuer
+* nome
+* descricao
+* emissor
 
 ### certificacao_fornecedor
 
 * id
-* supplier_id
-* certification_id
-* issue_date
-* expiration_date
+* id_fornecedor
+* id_certificacao
+* data_emissao
+* data_expiracao
 * status
-* file_url
+* url_arquivo
 
 ### alerta
 
 * id
-* supplier_id
-* alert_type
-* severity
-* title
-* description
-* due_date
+* id_fornecedor
+* tipo_alerta
+* severidade
+* titulo
+* descricao
+* data_vencimento
 * status
-* created_at
-* resolved_at
+* criado_em
+* resolvido_em
 
 ### config
 
 * id
-* setting_key
-* setting_value
+* chave
+* valor
 
 ### audit_log
 
 * id
-* user_id
-* action
-* entity_name
-* entity_id
-* details
-* created_at
+* id_usuario
+* acao
+* entidade
+* id_entidade
+* detalhes
+* criado_em
 
 ---
 
