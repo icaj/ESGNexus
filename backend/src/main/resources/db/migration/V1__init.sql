@@ -30,10 +30,10 @@ CREATE TABLE avaliacoes_fornecedor (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     fornecedor_id BIGINT NOT NULL,
     data_avaliacao DATE NOT NULL,
-    nota_ambiental DECIMAL(10,2) NOT NULL,
-    nota_social DECIMAL(10,2) NOT NULL,
-    nota_governanca DECIMAL(10,2) NOT NULL,
-    nota_final DECIMAL(10,2) NOT NULL,
+    nota_ambiental DOUBLE NOT NULL,
+    nota_social DOUBLE NOT NULL,
+    nota_governanca DOUBLE NOT NULL,
+    nota_final DOUBLE NOT NULL,
     observacoes VARCHAR(1000),
     CONSTRAINT fk_avaliacao_fornecedor FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id)
 );

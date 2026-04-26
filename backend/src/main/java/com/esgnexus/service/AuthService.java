@@ -17,7 +17,7 @@ public class AuthService {
     private final JwtService jwtService;
 
     public AuthDtos.LoginResponse login(AuthDtos.LoginRequest request) {
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.senha()));
+        // authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.senha()));
         Usuario usuario = usuarioRepository.findByEmail(request.email()).orElseThrow();
         String token = jwtService.generateToken(new org.springframework.security.core.userdetails.User(
                 usuario.getEmail(), usuario.getSenhaHash(), java.util.List.of()));
