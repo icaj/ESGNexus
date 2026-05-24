@@ -1,29 +1,43 @@
-# ESG Nexus Frontend
+# ESG Nexus Frontend - Streamlit
 
-Frontend da solução ESG Nexus em Next.js.
+Frontend analitico em Python para exibir dashboards, ranking ESG, fornecedores, certificacoes, alertas e previsoes de score por machine learning.
 
-## Requisitos
-- Node.js 20+
-- npm
+## Stack
 
-## Configuração
-Crie o arquivo `.env.local` com base em `.env.example`.
+- Python 3.12+
+- Streamlit
+- Plotly
+- Pandas
+- Requests
 
-Exemplo:
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
-```
+## Configuracao
 
-## Executar localmente
 ```bash
-npm install
-npm run dev
+cp .env.example .env
 ```
 
-## Telas entregues
-- Login
-- Dashboard
-- Fornecedores
-- Ranking
-- Alertaas
-- Configurações
+Ajuste a URL do backend, se necessario:
+
+```env
+API_URL=http://localhost:8080
+```
+
+## Instalar e executar
+
+```bash
+chmod +x *.sh
+./instalar_e_executar_frontend.sh
+```
+
+Acesse:
+
+```text
+http://localhost:8501
+```
+
+Usuario inicial:
+
+```text
+admin@esgnexus.com
+admin123
+```

@@ -1,37 +1,44 @@
-# ESG Nexus Backend
+# ESG Nexus Backend - FastAPI + ML + NeonDB
 
-Backend da solução ESG Nexus em Java + Spring Boot.
+Backend Python para cadastro de fornecedores ESG, ranking, dashboards e previsao de score usando machine learning.
 
-## Requisitos
-- Java 21
-- Maven 3.9+
-- MariaDB ou MySQL
+## Stack
 
-## Configuração do banco
-Crie um banco chamado `esg_nexus` e ajuste o arquivo `src/main/resources/application.yml`.
+- Python 3.12+
+- FastAPI
+- PostgreSQL / NeonDB
+- Pandas
+- Scikit-learn
+- Uvicorn
 
-## Usuário inicial
-- e-mail: `admin@esgnexus.com`
-- senha: `admin123`
+## Configuracao
 
-## Executar localmente
 ```bash
-mvn spring-boot:run
+cp .env.example .env
 ```
 
-## Swagger
-- `/swagger-ui.html`
+Edite `DATABASE_URL` com sua string do NeonDB:
 
-## Endpoints principais
-- `POST /api/auth/login`
-- `GET /api/dashboard`
-- `GET /api/fornecedores`
-- `POST /api/fornecedores`
-- `GET /api/avaliacoes`
-- `POST /api/avaliacoes`
-- `GET /api/certificacoes`
-- `POST /api/certificacoes`
-- `GET /api/alertas`
-- `PUT /api/alertas/{id}/resolve`
-- `GET /api/configuracoes`
-- `POST /api/configuracoes`
+```env
+DATABASE_URL=postgresql://usuario:senha@ep-instancia.neon.tech/esg_nexus?sslmode=require
+```
+
+## Instalar e executar
+
+```bash
+chmod +x *.sh
+./instalar_e_executar.sh
+```
+
+API:
+
+```text
+http://localhost:8080/docs
+```
+
+Usuario inicial:
+
+```text
+admin@esgnexus.com
+admin123
+```

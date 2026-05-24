@@ -4,4 +4,6 @@ dist/
 build/
 out/
 *.log
+.venv/
+venv/
 .vscode/
