@@ -11,12 +11,12 @@ fi
 
 if [ ! -d node_modules ]; then
   echo "Dependencias nao encontradas. Executando npm install..."
-  npm install
+#  npm install
 fi
 
 if [ ! -f .env.local ]; then
   cat > .env.local <<ENV
-NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_API_URL=http://localhost:8080/api
 ENV
 fi
 

@@ -1,5 +1,8 @@
 from passlib.hash import bcrypt
 from app.db.connection import get_connection
+import logging
+
+logger = logging.getLogger(__name__)
 
 DDL = [
     '''CREATE TABLE IF NOT EXISTS perfis (
@@ -104,6 +107,28 @@ TRIGGERS = [
        FOR EACH ROW EXECUTE FUNCTION atualizar_data_atualizacao()'''
 ]
 
+SEED = [
+    '''INSERT INTO fornecedores (razao_social, nome_fantasia, cnpj, email, telefone, nome_contato, segmento, categoria, cidade, estado, pais, nivel_risco, status)
+       VALUES 
+       ('Fornecedor Verde Ltda', 'Fornecedor Verde', '11111111000101', 'contato@verde.com', '81999990001', 'Maria Silva', 'Industrial', 'Energia', 'Recife', 'PE', 'Brasil', 'BAIXO', 'ATIVO'),
+       ('Eco Social Servicos SA', 'Eco Social', '22222222000102', 'contato@ecosocial.com', '81999990002', 'Joao Souza', 'Servicos', 'Facilities', 'Sao Paulo', 'SP', 'Brasil', 'MEDIO', 'ATIVO');''',
+    '''INSERT INTO avaliacoes_fornecedor (fornecedor_id, data_avaliacao, nota_ambiental, nota_social, nota_governanca, nota_final, observacoes)
+       VALUES 
+       (1, '2026-04-10', 92, 88, 90, 90.10, 'Fornecedor com alto nivel de aderencia ESG'),
+       (2, '2026-04-12', 75, 82, 70, 75.35, 'Necessita fortalecer governanca');''',
+    '''INSERT INTO certificacoes (id, nome, descricao, orgao_emissor)
+       VALUES 
+       (1, 'ISO 14001', 'Certificação ambiental', 'ABNT'),
+       (2, 'ISO 45001', 'Certificação de segurança e saúde no trabalho', 'Bureau Veritas');''',
+    '''INSERT INTO certificacoes_fornecedor (fornecedor_id, certificacao_id, data_emissao, data_validade, status, url_arquivo)
+       VALUES 
+       (1, 1, '2025-01-15', '2027-01-15', 'VALIDA', 'https://example.com/cert1.pdf'),
+       (2, 2, '2024-08-01', '2026-08-01', 'VALIDA', 'https://example.com/cert2.pdf');''',
+    '''INSERT INTO alertas (fornecedor_id, tipo_alerta, severidade, titulo, descricao, status)
+       VALUES 
+       (2, 'NOTA_GOVERNANCA_BAIXA', 'ALTA', 'Governanca abaixo da meta', 'Fornecedor com score de governanca abaixo da meta minima.', 'ABERTO');'''
+]
+
 def init_db():
     with get_connection() as conn:
         cur = conn.cursor()
@@ -144,4 +169,10 @@ def init_db():
                    ON CONFLICT (chave) DO NOTHING""",
                 (chave, valor)
             )
+            
+        for seed in SEED:
+            print(f"Executando seed: {seed[:50]}...")
+            logger.info(f"Executando seed: {seed[:50]}...")
+            cur.execute(seed)
+            
         cur.close()
