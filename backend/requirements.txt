@@ -11,3 +11,10 @@ numpy
 scikit-learn
 joblib
 python-multipart
+mathplotlib
+warnings
+seaborn
+sklearn
+kagglehub
+shutil
+
