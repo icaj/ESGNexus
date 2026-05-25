@@ -16,7 +16,7 @@ from .schemas import (
     CertificacaoCreate,
     MlPrevisaoRequest,
 )
-from .security import verificar_senha, gerar_token, obter_usuario_logado
+from .security import verificar_senha, gerar_token, obter_usuario_logado, obter_usuarios_logados
 from .ml_service import prever_score, treinar_modelo_demo
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -328,3 +328,9 @@ async def importar_csv(arquivo: UploadFile = File(...), usuario=Depends(obter_us
             ))
             total += 1
     return {"mensagem": "Importacao processada", "linhas_lidas": total}
+
+
+@app.get("/api/usuarios-logados")
+def usuarios_logados(usuarios=Depends(obter_usuarios_logados)):
+    usuarios = obter_usuarios_logados()
+    return {"usuarios_logados": list(usuarios.values())}

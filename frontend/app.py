@@ -80,7 +80,7 @@ def sidebar():
     st.sidebar.caption(f"Usuario: {usuario.get('nome', 'admin')}")
     pagina = st.sidebar.radio(
         "Menu",
-        ["Dashboard", "Fornecedores", "Ranking", "Avaliacoes", "Certificacoes", "Alertas", "Machine Learning", "Importacao CSV"],
+        ["Dashboard", "Fornecedores", "Ranking", "Avaliacoes", "Certificacoes", "Alertas", "Machine Learning", "Importacao CSV", "Usuarios Logados"],
     )
     if st.sidebar.button("Sair", use_container_width=True):
         st.session_state.clear()
@@ -95,8 +95,8 @@ def dashboard_page():
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Fornecedores", kpis["total_fornecedores"])
-    c2.metric("Avaliacoes", kpis["total_avaliacoes"])
-    c3.metric("Score medio", kpis["media_score"])
+    c2.metric("Avaliações", kpis["total_avaliacoes"])
+    c3.metric("Score médio", kpis["media_score"])
     c4.metric("Alertas abertos", kpis["alertas_abertos"])
 
     col1, col2 = st.columns(2)
@@ -186,15 +186,15 @@ def ranking_page():
 
 
 def avaliacoes_page():
-    st.title("Avaliacoes ESG")
+    st.title("Avaliações ESG")
     fornecedores = api_get("/api/fornecedores")
     if not fornecedores:
         st.warning("Cadastre fornecedores antes de avaliar.")
         return
     opcoes = {f"{f['razao_social']} - ID {f['id']}": f["id"] for f in fornecedores}
-    with st.form("avaliacao"):
+    with st.form("avaliação"):
         fornecedor_label = st.selectbox("Fornecedor", list(opcoes.keys()))
-        data_avaliacao = st.date_input("Data da avaliacao", value=date.today())
+        data_avaliacao = st.date_input("Data da avaliação", value=date.today())
         col1, col2, col3 = st.columns(3)
         nota_ambiental = col1.slider("Nota ambiental", 0, 100, 70)
         nota_social = col2.slider("Nota social", 0, 100, 70)
@@ -206,11 +206,11 @@ def avaliacoes_page():
                 "nota_ambiental": nota_ambiental, "nota_social": nota_social,
                 "nota_governanca": nota_governanca, "observacoes": observacoes,
             })
-            st.success(f"Avaliacao salva. Nota final: {resp['nota_final']} - Classe {resp['classificacao']}")
+            st.success(f"Avaliação salva. Nota final: {resp['nota_final']} - Classe {resp['classificacao']}")
 
 
 def certificacoes_page():
-    st.title("Certificacoes")
+    st.title("Certificações")
     fornecedores = api_get("/api/fornecedores")
     if fornecedores:
         opcoes = {f"{f['razao_social']} - ID {f['id']}": f["id"] for f in fornecedores}
@@ -264,6 +264,17 @@ def importacao_page():
         st.success(resp)
 
 
+def usuarios_logados_page():
+    st.title("Usuarios Logados")
+    data = api_get("/api/usuarios-logados")
+    usuarios = data.get("usuarios_logados", [])
+    if not usuarios:
+        st.info("Nenhum usuario logado.")
+    else:
+        df = pd.DataFrame(usuarios)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        
 def main():
     if "token" not in st.session_state:
         login_page()
@@ -277,6 +288,7 @@ def main():
     elif pagina == "Alertas": alertas_page()
     elif pagina == "Machine Learning": ml_page()
     elif pagina == "Importacao CSV": importacao_page()
+    elif pagina == "Usuarios Logados": usuarios_logados_page()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+#set -e
 cd "$(dirname "$0")"
 
 if [ ! -d ".venv" ]; then
@@ -7,7 +7,7 @@ if [ ! -d ".venv" ]; then
 fi
 
 source .venv/bin/activate
-python -m pip install --upgrade pip
+python3 -m pip install --upgrade pip
 pip install -r requirements.txt
 
 if [ ! -f ".env" ]; then

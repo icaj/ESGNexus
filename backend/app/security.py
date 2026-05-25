@@ -25,3 +25,7 @@ def obter_usuario_logado(authorization: str | None = Header(default=None)):
     if not usuario:
         raise HTTPException(status_code=401, detail="Token invalido ou expirado")
     return usuario
+
+def obter_usuarios_logados() -> Dict[str, dict]:
+    print("Usuarios logados:", TOKENS)  # Log para depuração
+    return TOKENS

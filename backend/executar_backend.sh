@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
-#source .venv/bin/activate
+source .venv/bin/activate
 
 HOST=${APP_HOST:-0.0.0.0}
 PORT=${APP_PORT:-8080}
