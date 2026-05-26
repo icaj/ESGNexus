@@ -394,7 +394,9 @@ def sidebar():
             "Certificacoes",
             "Alertas",
             "Machine Learning",
+            "Treinamento do Modelo",
             "Importacao CSV",
+            "Usuarios Logados",
         ],
     )
     st.sidebar.markdown("---")
@@ -954,6 +956,102 @@ def ml_page():
     st.plotly_chart(plot_template(fig, 430), use_container_width=True)
 
 
+def treinamento_modelo_page():
+    titulo_pagina(
+        "Treinamento do Modelo ESG",
+        "Dispare o pipeline de download Kaggle, preprocessamento, engenharia de atributos, treino, avaliacao e salvamento dos modelos.",
+        badges=[("Kaggle", "info-badge"), ("KNN + Random Forest", "soft-badge"), ("Execucao no backend", "soft-badge")],
+    )
+
+    st.info(
+        "O treinamento roda no backend FastAPI em segundo plano. "
+        "O frontend apenas dispara a rotina e consulta o status. "
+        "O servidor precisa ter acesso a internet para baixar a base publica via KaggleHub."
+    )
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        iniciar = st.button("Iniciar treinamento", use_container_width=True)
+    with col2:
+        retreinar = st.button("Forcar retreinamento", use_container_width=True)
+    with col3:
+        atualizar = st.button("Atualizar status", use_container_width=True)
+
+    if iniciar or retreinar:
+        try:
+            resp = requests.post(
+                f"{API_URL}/api/ml/treinar-kaggle",
+                params={"force": bool(retreinar)},
+                headers=api_headers(),
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                st.error(resp.text)
+            else:
+                st.success(resp.json())
+        except Exception as exc:
+            st.error(f"Erro ao disparar treinamento: {exc}")
+
+    try:
+        status = api_get("/api/ml/treinamento-status")
+    except Exception as exc:
+        st.error(f"Nao foi possivel consultar o status do treinamento: {exc}")
+        return
+
+    status_atual = status.get("status", "NAO_EXECUTADO")
+    mensagem = status.get("mensagem", "")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Status", status_atual)
+    c2.metric("Inicio", status.get("iniciado_em") or "-")
+    c3.metric("Fim", status.get("finalizado_em") or "-")
+
+    if status_atual == "EXECUTANDO":
+        st.warning(mensagem or "Treinamento em execucao.")
+    elif status_atual == "CONCLUIDO":
+        st.success(mensagem or "Treinamento concluido.")
+    elif status_atual == "ERRO":
+        st.error(mensagem or "Treinamento concluido com erro.")
+    else:
+        st.caption(mensagem or "Nenhum treinamento executado.")
+
+    artefatos = status.get("artefatos", {}).get("arquivos", []) if isinstance(status.get("artefatos"), dict) else []
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        st.subheader("Artefatos gerados")
+        if artefatos:
+            df_art = pd.DataFrame(artefatos)
+            st.dataframe(df_art, use_container_width=True, hide_index=True)
+
+            df_art["tipo"] = df_art["arquivo"].str.extract(r"\.([A-Za-z0-9]+)$").fillna("outro")
+            resumo = df_art.groupby("tipo").size().reset_index(name="total")
+            fig = px.bar(resumo, x="tipo", y="total", text="total", title="Arquivos por tipo")
+            st.plotly_chart(plot_template(fig, 320), use_container_width=True)
+        else:
+            st.info("Nenhum artefato registrado ainda.")
+
+    with col_b:
+        st.subheader("Etapas do pipeline")
+        etapas = pd.DataFrame([
+            {"Etapa": "0", "Descricao": "Download Kaggle", "Status": "Automatica"},
+            {"Etapa": "1", "Descricao": "Pre-processamento", "Status": "Automatica"},
+            {"Etapa": "2", "Descricao": "Metricas, risco e impacto", "Status": "Automatica"},
+            {"Etapa": "3", "Descricao": "Analise exploratoria", "Status": "Automatica"},
+            {"Etapa": "4", "Descricao": "Features", "Status": "Automatica"},
+            {"Etapa": "5", "Descricao": "Treino KNN/RF", "Status": "Automatica"},
+            {"Etapa": "6", "Descricao": "Avaliacao", "Status": "Automatica"},
+            {"Etapa": "7", "Descricao": "Salvamento dos modelos", "Status": "Automatica"},
+        ])
+        st.dataframe(etapas, use_container_width=True, hide_index=True)
+
+    st.subheader("Log do treinamento")
+    log_tail = status.get("log_tail") or "Sem log disponivel."
+    st.code(log_tail, language="text")
+
+    if atualizar:
+        st.rerun()
+
+
 def importacao_page():
     titulo_pagina("Importacao CSV", "Importe fornecedores em lote para acelerar a composicao da base ESG.")
 
@@ -1007,6 +1105,8 @@ def main():
         alertas_page()
     elif pagina == "Machine Learning":
         ml_page()
+    elif pagina == "Treinamento do Modelo":
+        treinamento_modelo_page()
     elif pagina == "Importacao CSV":
         importacao_page()
     elif pagina == "Usuarios Logados":

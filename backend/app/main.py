@@ -16,8 +16,9 @@ from .schemas import (
     CertificacaoCreate,
     MlPrevisaoRequest,
 )
-from .security import verificar_senha, gerar_token, obter_usuario_logado, obter_usuarios_logados
+from .security import verificar_senha, gerar_token, obter_usuario_logado
 from .ml_service import prever_score, treinar_modelo_demo
+from .training_service import iniciar_treinamento, obter_status_treinamento
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -308,6 +309,20 @@ def ml_prever_score(dados: MlPrevisaoRequest, usuario=Depends(obter_usuario_loga
     return prever_score(dados)
 
 
+@app.post("/api/ml/treinar-kaggle")
+def ml_treinar_kaggle(force: bool = False, usuario=Depends(obter_usuario_logado)):
+    """Dispara o pipeline Kaggle/ML em segundo plano.
+
+    Use force=true para retreinar mesmo quando ja existir um modelo treinado.
+    """
+    return iniciar_treinamento(force=force)
+
+
+@app.get("/api/ml/treinamento-status")
+def ml_status_treinamento(usuario=Depends(obter_usuario_logado)):
+    return obter_status_treinamento()
+
+
 @app.post("/api/ml/importar-fornecedores-csv")
 async def importar_csv(arquivo: UploadFile = File(...), usuario=Depends(obter_usuario_logado)):
     df = pd.read_csv(arquivo.file)
@@ -328,9 +343,3 @@ async def importar_csv(arquivo: UploadFile = File(...), usuario=Depends(obter_us
             ))
             total += 1
     return {"mensagem": "Importacao processada", "linhas_lidas": total}
-
-
-@app.get("/api/usuarios-logados")
-def usuarios_logados(usuarios=Depends(obter_usuarios_logados)):
-    usuarios = obter_usuarios_logados()
-    return {"usuarios_logados": list(usuarios.values())}

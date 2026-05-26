@@ -1,43 +1,36 @@
-# ESG Nexus Frontend - Streamlit
+# ESG Nexus Frontend Streamlit - Visual Avancado
 
-Frontend analitico em Python para exibir dashboards, ranking ESG, fornecedores, certificacoes, alertas e previsoes de score por machine learning.
+Esta versao preserva as rotas e funcionalidades do `app.py` original, mas adiciona:
 
-## Stack
+- identidade visual profissional com CSS customizado
+- tela de login mais elaborada
+- cards executivos
+- dashboard com gauge, histograma, boxplot, pizza, heatmap, correlacao, dispersao, funil e ranking
+- pagina de ranking com estatisticas descritivas
+- graficos adicionais para certificacoes, alertas e machine learning
+- filtros por segmento, classificacao e risco
 
-- Python 3.12+
-- Streamlit
-- Plotly
-- Pandas
-- Requests
-
-## Configuracao
+## Executar
 
 ```bash
-cp .env.example .env
+pip install streamlit pandas plotly requests python-dotenv
+streamlit run app.py
 ```
 
-Ajuste a URL do backend, se necessario:
+Configure a API no arquivo `.env`:
 
 ```env
 API_URL=http://localhost:8080
 ```
 
-## Instalar e executar
+## Treinamento do modelo ESG
 
-```bash
-chmod +x *.sh
-./instalar_e_executar_frontend.sh
-```
+Esta versão adiciona o menu **Treinamento do Modelo**.
 
-Acesse:
+O botão dispara no backend FastAPI o endpoint:
 
-```text
-http://localhost:8501
-```
+- `POST /api/ml/treinar-kaggle`
+- `POST /api/ml/treinar-kaggle?force=true`
+- `GET /api/ml/treinamento-status`
 
-Usuario inicial:
-
-```text
-admin@esgnexus.com
-admin123
-```
+O pipeline baixa a base pública do Kaggle via KaggleHub, processa os dados, treina KNN e Random Forest e salva os artefatos em `modelos/` e `data/` no backend.

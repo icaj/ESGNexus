@@ -42,3 +42,26 @@ Usuario inicial:
 admin@esgnexus.com
 admin123
 ```
+
+
+## Treinamento ML com base Kaggle
+
+Esta versão inclui um pipeline de treinamento baseado nos scripts `app/ml_pipeline/*`.
+
+Endpoints:
+
+- `POST /api/ml/treinar-kaggle` — inicia o treinamento em segundo plano.
+- `POST /api/ml/treinar-kaggle?force=true` — força novo treinamento.
+- `GET /api/ml/treinamento-status` — consulta status, log e artefatos gerados.
+
+Artefatos gerados:
+
+- `modelos/modelo_knn.pkl`
+- `modelos/modelo_rf.pkl`
+- `modelos/config.pkl`
+- `data/bronze/base_processada.csv`
+- `data/bronze/pesos_por_industria.csv`
+- `data/processado/analise_exploratoria.png`
+- `data/processado/avaliacao_modelos.png`
+
+Observação: o download do dataset usa KaggleHub e precisa de acesso à internet. Para datasets privados, configure suas credenciais Kaggle no ambiente.
