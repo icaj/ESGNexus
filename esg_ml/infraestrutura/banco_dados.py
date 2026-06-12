@@ -10,6 +10,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
+# Fallback para desenvolvimento local; em produção usa-se NeonDB via DATABASE_URL no .env
 URL_BANCO_PADRAO = "postgresql+psycopg://esg:esg@localhost:5432/esg_nexus"
 
 
@@ -45,16 +46,22 @@ def obter_url_banco_mascarada() -> str:
     return make_url(_obter_url_banco()).render_as_string(hide_password=True)
 
 
+_PSYCOPG3_SSL_PARAMS = {"sslmode", "sslrootcert", "sslcert", "sslkey", "channel_binding"}
+
+
 def _argumentos_engine(url_banco: str) -> dict:
     url = make_url(url_banco)
-    argumentos = {"pool_pre_ping": True}
+    argumentos: dict = {"pool_pre_ping": True}
     if url.drivername.startswith("sqlite"):
         argumentos["connect_args"] = {"check_same_thread": False}
         return argumentos
     argumentos["pool_size"] = int(os.getenv("DATABASE_POOL_SIZE", "5"))
     argumentos["max_overflow"] = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
-    if url.drivername.startswith("postgresql") and "sslmode" in url.query:
-        argumentos["connect_args"] = {"sslmode": url.query["sslmode"]}
+    # Repassa para o driver psycopg3 todos os parâmetros SSL presentes na URL
+    # (sslmode, channel_binding, etc.) via connect_args, evitando duplicação.
+    ssl_params = {k: v for k, v in url.query.items() if k in _PSYCOPG3_SSL_PARAMS}
+    if ssl_params:
+        argumentos["connect_args"] = ssl_params
     return argumentos
 
 

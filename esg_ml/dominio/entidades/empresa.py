@@ -2,7 +2,9 @@
 # CRISP-DM Fase 1 — Vocabulário do negócio ESG (Edenred Brasil)
 # Zero dependências externas — Python puro
 
-from dataclasses import dataclass
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -67,10 +69,26 @@ class Quadrante:
 
 @dataclass
 class Empresa:
-    """Entidade central — empresa com identidade e scores ESG."""
+    """Entidade central — empresa com identidade, scores ESG e dados cadastrais opcionais.
+
+    Campos obrigatórios para a engine de ML: name, industry, scores (E/S/G).
+    Campos opcionais são usados apenas para cadastro/identificação no banco de dados
+    e não influenciam a classificação.
+    """
+    # ── Obrigatórios (engine ML) ──────────────────────────────────────────
     name:     str
     industry: str
     scores:   ScoreESG
+
+    # ── Opcionais (cadastro / identificação) ──────────────────────────────
+    cnpj:                    Optional[str] = field(default=None)
+    email:                   Optional[str] = field(default=None)
+    telefone:                Optional[str] = field(default=None)
+    contato:                 Optional[str] = field(default=None)  # nome do responsável
+    quantidade_funcionarios: Optional[int] = field(default=None)
+    endereco:                Optional[str] = field(default=None)
+    website:                 Optional[str] = field(default=None)
+    descricao:               Optional[str] = field(default=None)
 
 
 PLANOS_ACAO = {
