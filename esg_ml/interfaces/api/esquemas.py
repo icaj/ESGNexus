@@ -8,30 +8,24 @@ from pydantic import BaseModel, Field
 # ── Entrada ───────────────────────────────────────────────────────────────────
 
 class FornecedorEntrada(BaseModel):
-    """Entrada da API para classificação de fornecedor.
-
-    Campos obrigatórios (engine ML):
-        name, industry, environment_score, social_score, governance_score
-
-    Campos opcionais (cadastro/identificação):
-        cnpj, email, telefone, contato, quantidade_funcionarios, endereco, website, descricao
-    """
-    # ── Obrigatórios ──────────────────────────────────────────────────────
-    name:              str
-    industry:          str = 'Unknown'
-    environment_score: int = Field(ge=0, le=1000)
-    social_score:      int = Field(ge=0, le=1000)
-    governance_score:  int = Field(ge=0, le=1000)
-
-    # ── Opcionais ─────────────────────────────────────────────────────────
-    cnpj:                    Optional[str] = None
-    email:                   Optional[str] = None
-    telefone:                Optional[str] = None
-    contato:                 Optional[str] = None   # nome do responsável
-    quantidade_funcionarios: Optional[int] = Field(default=None, ge=0)
-    endereco:                Optional[str] = None
-    website:                 Optional[str] = None
-    descricao:               Optional[str] = None
+    """Entrada da API para avaliação ESG de fornecedor."""
+    codigo_fornecedor:                str
+    razao_social:                     str
+    cnpj:                             str
+    setor:                            str
+    pais:                             str   = "BR"
+    possui_politica_ambiental:        bool  = False
+    emissoes_carbono_ton:             float = Field(ge=0)
+    percentual_energia_renovavel:     float = Field(ge=0, le=100)
+    percentual_reciclagem_residuos:   float = Field(ge=0, le=100)
+    incidentes_trabalhistas_12m:      int   = Field(ge=0)
+    possui_programa_diversidade:      bool  = False
+    possui_politica_privacidade_dados: bool = False
+    possui_politica_anticorrupcao:    bool  = False
+    consta_lista_sancoes:             bool  = False
+    noticias_negativas_12m:           int   = Field(ge=0)
+    quantidade_certificacoes:         int   = Field(ge=0)
+    receita_anual:                    float = Field(ge=0)
 
 
 class ClassificacaoLoteEntrada(BaseModel):
