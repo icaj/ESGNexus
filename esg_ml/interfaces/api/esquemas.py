@@ -1,4 +1,4 @@
-# esg_ml/interfaces/api/esquemas.py — Pydantic schemas nexus_v2
+# esg_ml/interfaces/api/esquemas.py — Pydantic schemas nexus_v3
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 # ── Entrada ───────────────────────────────────────────────────────────────────
 
 class FornecedorEntrada(BaseModel):
-    """Entrada da API para avaliação ESG de fornecedor."""
+    """Entrada da API — 17 métricas de domínio em português."""
     codigo_fornecedor:                str
     razao_social:                     str
     cnpj:                             str
@@ -35,17 +35,35 @@ class ClassificacaoLoteEntrada(BaseModel):
 # ── Saída: Plano de Ação ──────────────────────────────────────────────────────
 
 class PlanoAcaoSaida(BaseModel):
-    """Item individual do plano de ação recomendado pela engine ML."""
-    pilar:       str    # 'E', 'S' ou 'G'
-    score:       int    # score atual do pilar (0–1000)
-    importancia: float  # feature importance RF
-    acao:        str    # descrição da ação recomendada
+    pilar:       str
+    score:       int
+    importancia: float
+    acao:        str
 
 
 # ── Saída: Avaliação completa ─────────────────────────────────────────────────
 
 class AvaliacaoSaida(BaseModel):
-    """Resultado completo do diagnóstico ESG (23 campos + plano de ação estruturado)."""
+    """Resultado completo do diagnóstico ESG — inclui campos PT para o frontend."""
+
+    # ── Identificação PT ──────────────────────────────────────────────────
+    codigo_fornecedor:           Optional[str]   = None
+    razao_social:                Optional[str]   = None
+    setor:                       Optional[str]   = None
+
+    # ── Pontuação 0-100 (escala do frontend) ──────────────────────────────
+    pontuacao_ambiental:         Optional[int]   = None
+    pontuacao_social:            Optional[int]   = None
+    pontuacao_governanca:        Optional[int]   = None
+    pontuacao_esg:               Optional[float] = None
+
+    # ── Classificação PT ──────────────────────────────────────────────────
+    nivel_risco:                 Optional[str]   = None
+    recomendacao:                Optional[str]   = None
+    probabilidade_ml_alto_risco: Optional[float] = None
+    motivos:                     list[str]       = []
+
+    # ── Campos ML internos (mantidos para compatibilidade) ────────────────
     name:                  str
     industry:              str
     environment_score:     int
@@ -68,8 +86,8 @@ class AvaliacaoSaida(BaseModel):
     maturidade_knn:        str
     confianca_knn_high:    float
     confianca_knn_medium:  float
-    acoes_recomendadas:    str   # resumo textual (retrocompatibilidade)
-    plano_acao:            list[PlanoAcaoSaida] = []  # itens estruturados
+    acoes_recomendadas:    str
+    plano_acao:            list[PlanoAcaoSaida] = []
 
 
 class ResultadoClassificacaoLote(BaseModel):
@@ -82,7 +100,6 @@ class ResultadoClassificacaoLote(BaseModel):
 # ── Saída: Histórico ──────────────────────────────────────────────────────────
 
 class HistoricoItemSaida(BaseModel):
-    """Resumo de uma avaliação no histórico temporal do fornecedor."""
     avaliacao_id:      int
     criado_em:         datetime
     environment_score: int
@@ -101,19 +118,20 @@ class HistoricoItemSaida(BaseModel):
 
 
 class HistoricoFornecedorSaida(BaseModel):
-    """Histórico completo de um fornecedor com todas as suas avaliações."""
-    fornecedor_id:  int
-    name:           str
-    industry:       str
+    fornecedor_id:    int
+    name:             str
+    industry:         str
     total_avaliacoes: int
-    avaliacoes:     list[HistoricoItemSaida]
+    avaliacoes:       list[HistoricoItemSaida]
 
 
 # ── Saída: Fornecedor com dados cadastrais ────────────────────────────────────
 
 class FornecedorSaida(BaseModel):
-    """Dados completos do fornecedor cadastrado."""
+    """Dados do fornecedor cadastrado."""
     id:                      int
+    codigo_fornecedor:       Optional[str] = None
+    razao_social:            Optional[str] = None
     name:                    str
     industry:                str
     environment_score:       int
