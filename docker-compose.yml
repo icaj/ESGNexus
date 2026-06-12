@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: esg_nexus
+      POSTGRES_USER: esg
+      POSTGRES_PASSWORD: esg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U esg -d esg_nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     command: uvicorn esg_ml.interfaces.api.principal:app --host 0.0.0.0 --port 8000
@@ -11,12 +27,14 @@ services:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
     depends_on:
+      postgres:
+        condition: service_healthy
       mlflow:
         condition: service_started
 
   frontend-streamlit:
     build: .
-    command: streamlit run frontend_streamlit/app.py --server.address 0.0.0.0 --server.port 8501
+    command: streamlit run frontend/frontend/app.py --server.address 0.0.0.0 --server.port 8501  # BUG 3 corrigido
     ports:
       - "8501:8501"
     env_file: .env
@@ -40,13 +58,16 @@ services:
     env_file: .env
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   airflow-init:
     image: apache/airflow:2.9.3
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "${DATABASE_URL}"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
@@ -55,6 +76,9 @@ services:
     command: version
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   airflow-webserver:
     image: apache/airflow:2.9.3
@@ -64,7 +88,7 @@ services:
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "${DATABASE_URL}"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       ESG_NEXUS_API_URL: http://api:8000
     command: webserver
@@ -81,7 +105,7 @@ services:
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "${DATABASE_URL}"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       ESG_NEXUS_API_URL: http://api:8000
     command: scheduler
@@ -89,4 +113,6 @@ services:
       - ./airflow/dags:/opt/airflow/dags
 
 volumes:
+  postgres_data:
   mlflow_artifacts:
+  
