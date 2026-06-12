@@ -28,7 +28,7 @@ carregar_variaveis_ambiente()
 
 
 class Base(DeclarativeBase):
-    pass
+    __allow_unmapped__ = True 
 
 
 def _obter_url_banco() -> str:
