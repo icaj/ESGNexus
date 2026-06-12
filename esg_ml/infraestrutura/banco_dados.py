@@ -19,16 +19,9 @@ def _raiz_projeto() -> Path:
 
 
 def carregar_variaveis_ambiente() -> None:
-    """Carrega explicitamente o arquivo .env localizado na raiz do projeto.
-
-    Usamos override=True para que o .env do projeto tenha precedência sobre
-    variáveis DATABASE_URL antigas configuradas no terminal do desenvolvedor.
-    Isso evita conectar por engano no PostgreSQL local quando o arquivo .env
-    aponta para NeonDB.
-    """
     caminho_env = _raiz_projeto() / ".env"
     if caminho_env.exists():
-        load_dotenv(dotenv_path=caminho_env, override=True)
+        load_dotenv(dotenv_path=caminho_env)  # removido override=True
 
 
 carregar_variaveis_ambiente()
