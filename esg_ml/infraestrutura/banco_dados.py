@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from collections.abc import Generator
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+
+URL_BANCO_PADRAO = "postgresql+psycopg://esg:esg@localhost:5432/esg_nexus"
+
+
+def _raiz_projeto() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def carregar_variaveis_ambiente() -> None:
+    """Carrega explicitamente o arquivo .env localizado na raiz do projeto.
+
+    Usamos override=True para que o .env do projeto tenha precedência sobre
+    variáveis DATABASE_URL antigas configuradas no terminal do desenvolvedor.
+    Isso evita conectar por engano no PostgreSQL local quando o arquivo .env
+    aponta para NeonDB.
+    """
+    caminho_env = _raiz_projeto() / ".env"
+    if caminho_env.exists():
+        load_dotenv(dotenv_path=caminho_env, override=True)
+
+
+carregar_variaveis_ambiente()
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+def _obter_url_banco() -> str:
+    return os.getenv("DATABASE_URL", URL_BANCO_PADRAO)
+
+
+def obter_url_banco_mascarada() -> str:
+    return make_url(_obter_url_banco()).render_as_string(hide_password=True)
+
+
+def _argumentos_engine(url_banco: str) -> dict:
+    url = make_url(url_banco)
+    argumentos = {"pool_pre_ping": True}
+    if url.drivername.startswith("sqlite"):
+        argumentos["connect_args"] = {"check_same_thread": False}
+        return argumentos
+    argumentos["pool_size"] = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+    argumentos["max_overflow"] = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
+    if url.drivername.startswith("postgresql") and "sslmode" in url.query:
+        argumentos["connect_args"] = {"sslmode": url.query["sslmode"]}
+    return argumentos
+
+
+URL_BANCO = _obter_url_banco()
+engine = create_engine(URL_BANCO, **_argumentos_engine(URL_BANCO))
+SessaoLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+def obter_sessao() -> Generator[Session, None, None]:
+    sessao = SessaoLocal()
+    try:
+        yield sessao
+    finally:
+        sessao.close()
+
+
+def criar_tabelas() -> None:
+    from esg_ml.infraestrutura import modelos_banco  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)

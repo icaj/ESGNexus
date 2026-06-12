@@ -1,4 +1,0 @@
-razao_social,nome_fantasia,cnpj,email,segmento,categoria,estado,cidade,nivel_risco,status
-Fornecedor Verde Ltda,Fornecedor Verde,11111111000191,contato@verde.com,Industria,Insumos,PE,Recife,BAIXO,ATIVO
-Eco Servicos SA,Eco Servicos,22222222000191,contato@eco.com,Servicos,Manutencao,SP,Sao Paulo,MEDIO,ATIVO
-Metal Forte Ltda,Metal Forte,33333333000191,contato@metal.com,Metalurgia,Materia-prima,MG,Belo Horizonte,ALTO,ATIVO
