@@ -62,9 +62,8 @@ class FornecedorBanco(Base):
                                                             onupdate=lambda: datetime.now(timezone.utc))
 
     # ── Relacionamentos ───────────────────────────────────────────────────
-    avaliacoes:  list['AvaliacaoBanco'] = relationship('AvaliacaoBanco',  back_populates='fornecedor',
-                                                        order_by='AvaliacaoBanco.criado_em.desc()',
-                                                        lazy='dynamic')
+    avaliacoes:  Mapped[list["AvaliacaoBanco"]] = relationship(back_populates="fornecedor")
+    
     planos_acao: list['PlanoAcaoBanco'] = relationship('PlanoAcaoBanco',  back_populates='fornecedor',
                                                         lazy='dynamic')
 
