@@ -13,7 +13,7 @@ from esg_ml.infraestrutura.registro_log import obter_registrador
 
 registrador = obter_registrador(__name__)
 
-EMAIL_ADMIN_PADRAO = 'admin@esgnexus.local'
+EMAIL_ADMIN_PADRAO = 'admin@esgnexus.example'
 SENHA_ADMIN_PADRAO = 'admin123'
 
 

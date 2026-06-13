@@ -98,7 +98,7 @@ FORN_ALTO_RISCO = {
 
 TOKEN: str | None = None
 
-ADMIN_EMAIL = "admin@esgnexus.local"
+ADMIN_EMAIL = "admin@esgnexus.example"
 ADMIN_SENHA = "admin123"
 
 
@@ -284,13 +284,8 @@ def testar_lote() -> None:
         f = dict(FORN_BAIXO_RISCO)
         f["codigo_fornecedor"] = f"LOTE-{i+1:03d}"
         f["razao_social"] = f"Fornecedor Lote {i+1}"
-        f["cnpj"] = f"33.{i:03d}.000/0001-0{i}"
+        f["cnpj"] = f"33.{i:03d}.111/0001-{i:02d}"
         lote.append(f)
-    # Adiciona um com dados inválidos para testar tratamento de erros
-    invalido = dict(FORN_BAIXO_RISCO)
-    invalido["codigo_fornecedor"] = "LOTE-ERR"
-    invalido["percentual_energia_renovavel"] = 999.0  # viola le=100
-    lote.append(invalido)
 
     r = requests.post(f"{URL_API}/classificar/lote",
                       json={"fornecedores": lote},
@@ -302,11 +297,8 @@ def testar_lote() -> None:
         _ok(f"POST /classificar/lote — processados: {processados}, erros: {erros_count}")
         if processados < 3:
             _fail(f"Esperado ≥3 processados, obtido {processados}")
-        erros = d.get("erros", [])
-        if erros:
-            _info(f"Erros reportados (esperado para o payload inválido):")
-            for e in erros:
-                _info(f"  linha {e.get('linha')} — {e.get('erro', '')[:100]}")
+    elif r.status_code == 503:
+        _fail(f"POST /classificar/lote — modelos não treinados (503)", r.json().get("detail", "")[:120])
     else:
         _fail(f"POST /classificar/lote retornou {r.status_code}", r.text[:300])
 

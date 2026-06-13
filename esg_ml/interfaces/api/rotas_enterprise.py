@@ -277,10 +277,13 @@ def cadastrar_fornecedor(entrada: FornecedorEntrada,
 def classificar(entrada: FornecedorEntrada,
                 sessao: Session = Depends(obter_sessao)) -> AvaliacaoSaida:
     """Classifica um fornecedor e persiste resultado + plano de ação no banco."""
-    servico  = ServicoAvaliacao(repositorio)
-    resultado = _classificar_e_persistir(sessao, entrada, servico)
-    sessao.commit()
-    return resultado
+    servico = ServicoAvaliacao(repositorio)
+    try:
+        resultado = _classificar_e_persistir(sessao, entrada, servico)
+        sessao.commit()
+        return resultado
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 # ── Classificação em lote ─────────────────────────────────────────────────────
@@ -292,6 +295,13 @@ def classificar_lote(entrada: ClassificacaoLoteEntrada,
     """Classifica lista de fornecedores com rastreamento de erros por linha."""
     servico        = ServicoAvaliacao(repositorio)
     resultados, erros = [], []
+
+    ausentes = [n for n in ('modelo_knn', 'modelo_rf', 'config') if not repositorio.existe(n)]
+    if ausentes:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Modelos ausentes: {ausentes}. Execute: POST /treinar",
+        )
 
     for idx, forn in enumerate(entrada.fornecedores, 1):
         try:
@@ -354,6 +364,14 @@ async def avaliar_upload(
             return default if pd.isna(r) else int(r)
         except (TypeError, ValueError):
             return default
+
+    ausentes = [n for n in ('modelo_knn', 'modelo_rf', 'config') if not repositorio.existe(n)]
+    if ausentes:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Modelos ausentes: {ausentes}. Execute: POST /treinar",
+        )
 
     try:
         df = (pd.read_csv(tmp_path)

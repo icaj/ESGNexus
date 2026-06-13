@@ -12,7 +12,7 @@ URL_API = os.getenv("ESG_NEXUS_API_URL", "http://api:8000")
 # Credenciais da conta de serviço do Airflow — definir no .env do servidor
 # ESG_ADMIN_EMAIL e ESG_ADMIN_SENHA devem pertencer a um usuário administrador
 # ou cientista_dados criado previamente via POST /auth/registrar.
-ADMIN_EMAIL = os.getenv("ESG_ADMIN_EMAIL", "admin@esg.local")
+ADMIN_EMAIL = os.getenv("ESG_ADMIN_EMAIL", "admin@esg.example")
 ADMIN_SENHA  = os.getenv("ESG_ADMIN_SENHA",  "admin@ESG2026!")
 
 # Script bash: obtém JWT → chama /treinar com autenticação
