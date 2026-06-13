@@ -45,9 +45,9 @@ with DAG(
 Re-treina os modelos KNN e Random Forest diariamente às 02:00.
 
 **Pré-requisitos (primeira execução):**
-1. Criar conta de serviço via `POST /auth/registrar` com perfil `administrador`
-2. Definir `ESG_ADMIN_EMAIL` e `ESG_ADMIN_SENHA` no `.env` do servidor
-3. Garantir que o arquivo `data/raw/data.csv` (Kaggle ESG) esteja disponível
+1. Definir `ESG_ADMIN_EMAIL` e `ESG_ADMIN_SENHA` no `.env` do servidor
+   (a conta é criada automaticamente no startup da API se não existir)
+2. Garantir que o arquivo `data/raw/data.csv` (Kaggle ESG) esteja disponível
 
 **Fluxo:** verificar_api → treinar_modelo_esg
 """,
