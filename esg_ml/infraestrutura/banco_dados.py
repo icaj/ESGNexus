@@ -10,8 +10,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
-# Fallback para desenvolvimento local; em produção usa-se NeonDB via DATABASE_URL no .env
-URL_BANCO_PADRAO = "postgresql+psycopg://esg:esg@localhost:5432/esg_nexus"
+# Fallback para NeonDB; sobreposto por DATABASE_URL no .env quando presente
+URL_BANCO_PADRAO = "postgresql+psycopg://neondb_owner:npg_oQ4iTnNEqI3x@ep-fancy-art-apt303j2-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 
 def _raiz_projeto() -> Path:
