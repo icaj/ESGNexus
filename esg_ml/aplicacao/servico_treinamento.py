@@ -26,6 +26,7 @@ conf = Configuracoes()
 def _salvar_graficos(resultado: dict) -> list:
     pasta = str(conf.pasta_saida)
     os.makedirs(pasta, exist_ok=True)
+
     paths = []
 
     df = resultado['df']
@@ -95,7 +96,7 @@ class ServicoTreinamento:
         print('╚══════════════════════════════════════════════════════════╝')
 
         # Fase 2
-        print('\n[FASE 2] Carregando dados via LeitorKaggle...')
+        print('\n[FASE 2] Carregando dados...')
         caminho_dados = str(conf.diretorio_artefatos.parent / 'data' / 'raw' / 'data.csv')
         df_raw = LeitorKaggle().carregar(caminho_dados)
         print(f'  {len(df_raw)} empresas × {len(df_raw.columns)} colunas')
@@ -105,7 +106,7 @@ class ServicoTreinamento:
         df = preprocessar(df_raw)
         pesos_por_ind, pesos_global = calcular_pesos_por_industria(df)
         df = enriquecer_dataframe(df, pesos_por_ind, pesos_global)
-        pasta_bronze = str(conf.diretorio_artefatos.parent / 'data' / 'bronze')
+        pasta_bronze = str(conf.pasta_bronze)
         os.makedirs(pasta_bronze, exist_ok=True)
         base_ref = df[['name','industry','environment_score','social_score',
                         'governance_score','total_score','score_ponderado',

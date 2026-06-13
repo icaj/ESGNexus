@@ -13,18 +13,18 @@ class Configuracoes(BaseSettings):
     nome_aplicacao:      str  = 'ESG Nexus Enterprise'
     diretorio_artefatos: Path = _RAIZ_PROJETO / 'artifacts'
 
-    # Caminhos derivados (nexus_v2)
+    # Caminhos derivados — dentro de artifacts/ para garantir permissão de escrita
     @property
     def pasta_bronze(self) -> Path:
-        return self.diretorio_artefatos.parent / 'data' / 'bronze'
+        return self.diretorio_artefatos / 'bronze'
 
     @property
     def pasta_saida(self) -> Path:
-        return self.diretorio_artefatos.parent / 'data' / 'processado'
+        return self.diretorio_artefatos / 'processado'
 
     @property
     def pasta_resultados(self) -> Path:
-        return self.diretorio_artefatos.parent / 'data' / 'resultados'
+        return self.diretorio_artefatos / 'resultados'
 
     # MLflow
     mlflow_tracking_uri: str = 'http://localhost:5000'
