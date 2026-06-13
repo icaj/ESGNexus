@@ -191,20 +191,20 @@ class ServicoTreinamento:
 
     def _registrar_mlflow(self, resultado: dict, metricas: dict, graficos: list) -> None:
         try:
-            import mlflow, mlflow.sklearn
+            import mlflow
             mlflow.set_tracking_uri(conf.mlflow_tracking_uri)
             mlflow.set_experiment(conf.mlflow_experimento)
-            for nome, modelo, params, met in [
-                ('KNN_GridSearch',          resultado['knn_model'],
-                 resultado['knn_params'],   metricas['knn']),
-                ('RandomForest_GridSearch', resultado['rf_model'],
-                 resultado['rf_params'],    metricas['rf']),
+            artefatos = conf.diretorio_artefatos
+            for nome, params, met, joblib_nome in [
+                ('KNN_GridSearch',          resultado['knn_params'], metricas['knn'], 'modelo_knn.joblib'),
+                ('RandomForest_GridSearch', resultado['rf_params'],  metricas['rf'],  'modelo_rf.joblib'),
             ]:
                 with mlflow.start_run(run_name=nome):
                     mlflow.log_params(params)
                     mlflow.log_metrics(met)
-                    for g in graficos: mlflow.log_artifact(g, 'graficos')
-                    mlflow.sklearn.log_model(modelo, 'modelo')
+                    for g in graficos:
+                        mlflow.log_artifact(g, 'graficos')
+                    mlflow.log_artifact(str(artefatos / joblib_nome), 'modelo')
             print('  MLflow: experimentos registrados.')
         except Exception as e:
             registrador.warning('falha_registro_mlflow', erro=str(e))

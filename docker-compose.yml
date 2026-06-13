@@ -70,7 +70,7 @@ services:
       - api
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.12.2
+    image: ghcr.io/mlflow/mlflow:v2.20.2
     command: >
       mlflow server
       --host 0.0.0.0
