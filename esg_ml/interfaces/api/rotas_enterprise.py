@@ -237,9 +237,17 @@ def _classificar_e_persistir(
 @roteador.post('/treinar',
                dependencies=[Depends(exigir_perfil('administrador', 'cientista_dados'))])
 def treinar() -> dict:
-    """CRISP-DM Fases 2–6: baixa dados do Kaggle, GridSearchCV, critério Fase 5."""
+    """CRISP-DM Fases 2–6: baixa dados do Kaggle se ausentes, GridSearchCV, critério Fase 5."""
     from esg_ml.aplicacao.servico_treinamento import ServicoTreinamento
-    return ServicoTreinamento(repositorio).treinar()
+    from esg_ml.dominio.servicos.avaliacao import ModeloInsuficienteError
+    try:
+        return ServicoTreinamento(repositorio).treinar()
+    except (RuntimeError, FileNotFoundError) as exc:
+        # dataset ausente ou credenciais Kaggle não configuradas
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModeloInsuficienteError as exc:
+        # modelos treinados mas métricas abaixo do critério
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # ── Cadastro de fornecedor (sem classificação) ────────────────────────────────

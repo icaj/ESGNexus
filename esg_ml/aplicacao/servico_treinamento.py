@@ -2,7 +2,7 @@
 # Caso de uso: Treinar modelos ESG — CRISP-DM Fases 2–6
 # Mantém infraestrutura Enterprise (banco + MLflow) com núcleo nexus_v2
 
-import sys, os
+import os
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
@@ -133,7 +133,7 @@ class ServicoTreinamento:
         except ModeloInsuficienteError as e:
             registrador.error('modelo_insuficiente', erro=str(e))
             print(f'\n[FASE 5] REPROVADO:\n{e}')
-            sys.exit(1)
+            raise  # não usar sys.exit() — mata o uvicorn quando chamado via API
 
         graficos = _salvar_graficos(resultado)
 
