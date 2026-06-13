@@ -21,8 +21,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-CAMINHO_DADOS_DEMO = Path(__file__).resolve().parents[1] / "data" / "amostras" / "resultado_avaliacao.csv"
-
 CSS = """
 <style>
     .block-container {padding-top: 1.3rem; padding-bottom: 2rem;}
@@ -58,8 +56,6 @@ CSS = """
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
-
-
 
 
 COLUNAS_OBRIGATORIAS_IMPORTACAO = [
@@ -159,7 +155,6 @@ def validar_e_normalizar_importacao(df: pd.DataFrame) -> tuple[pd.DataFrame, lis
     return normalizado, erros
 
 
-
 def converter_para_json_nativo(valor):
     if pd.isna(valor):
         return None
@@ -230,76 +225,19 @@ def obter_cliente() -> ClienteApiESG:
     )
 
 
-def carregar_demo() -> pd.DataFrame:
-    if CAMINHO_DADOS_DEMO.exists():
-        df = pd.read_csv(CAMINHO_DADOS_DEMO)
-    else:
-        df = pd.DataFrame(
-            [
-                {"razao_social": "Fornecedor Demonstrativo A", "setor": "Tecnologia", "pais": "BR", "pontuacao_esg": 88, "nivel_risco": "baixo", "probabilidade_ml_alto_risco": 0.08, "pontuacao_ambiental": 82, "pontuacao_social": 91, "pontuacao_governanca": 89},
-                {"razao_social": "Fornecedor Demonstrativo B", "setor": "Logística", "pais": "BR", "pontuacao_esg": 42, "nivel_risco": "alto", "probabilidade_ml_alto_risco": 0.74, "pontuacao_ambiental": 35, "pontuacao_social": 55, "pontuacao_governanca": 38},
-            ]
-        )
-    if "setor" not in df.columns:
-        setores = ["Serviços", "Indústria", "Tecnologia", "Logística", "Alimentos", "Energia"]
-        df["setor"] = [setores[i % len(setores)] for i in range(len(df))]
-    if "pais" not in df.columns:
-        df["pais"] = "BR"
-    return df
-
-
-def montar_payload_executivo_local(df: pd.DataFrame) -> dict[str, Any]:
-    total = len(df)
-    return {
-        "kpis": {
-            "total_fornecedores": total,
-            "score_medio": round(float(df["pontuacao_esg"].mean()), 2) if total else 0,
-            "alto_risco": int((df["nivel_risco"].astype(str).str.lower() == "alto").sum()) if total else 0,
-            "probabilidade_ml_media": round(float(df["probabilidade_ml_alto_risco"].mean() * 100), 2) if total else 0,
-        },
-        "distribuicao_risco": (df.assign(nivel_risco=df["nivel_risco"].astype(str).str.lower()).groupby("nivel_risco", as_index=False).size().rename(columns={"size": "quantidade"}).to_dict("records")),
-        "medias_pilares": [
-            {"pilar": "Ambiental", "valor": round(float(df["pontuacao_ambiental"].mean()), 2)},
-            {"pilar": "Social", "valor": round(float(df["pontuacao_social"].mean()), 2)},
-            {"pilar": "Governança", "valor": round(float(df["pontuacao_governanca"].mean()), 2)},
-        ],
-        "top_risco": df.sort_values("probabilidade_ml_alto_risco", ascending=False).head(10).to_dict("records"),
-        "melhores": df.sort_values("pontuacao_esg", ascending=False).head(10).to_dict("records"),
-    }
-
-
-def montar_payload_ml_local(df: pd.DataFrame) -> dict[str, Any]:
-    return {
-        "distribuicao_scores": df[["razao_social", "pontuacao_esg", "nivel_risco", "setor"]].to_dict("records"),
-        "dispersao": df[["pontuacao_esg", "probabilidade_ml_alto_risco", "pontuacao_ambiental", "pontuacao_social", "pontuacao_governanca", "nivel_risco", "setor"]].to_dict("records"),
-        "feature_importance": [
-            {"variavel": "Governança", "importancia": 0.31},
-            {"variavel": "Lista de sanções", "importancia": 0.24},
-            {"variavel": "Ambiental", "importancia": 0.18},
-            {"variavel": "Social", "importancia": 0.16},
-            {"variavel": "Certificações", "importancia": 0.11},
-        ],
-        "metricas": {"accuracy": 0.91, "precision": 0.89, "recall": 0.87, "f1": 0.88},
-    }
-
-
 def dados_executivos() -> dict[str, Any]:
-    if st.session_state.get("modo_demo"):
-        return montar_payload_executivo_local(carregar_demo())
     return obter_cliente().dashboard_executivo()
 
 
 def dados_ml() -> dict[str, Any]:
-    if st.session_state.get("modo_demo"):
-        return montar_payload_ml_local(carregar_demo())
     return obter_cliente().dashboard_ml()
 
 
 def formulario_fornecedor(prefixo: str = "") -> dict[str, Any]:
     col1, col2, col3 = st.columns(3)
     with col1:
-        codigo = st.text_input("Código", value="FORN-DEMO-001", key=f"{prefixo}codigo")
-        razao = st.text_input("Razão social", value="Fornecedor Demonstração LTDA", key=f"{prefixo}razao")
+        codigo = st.text_input("Código", value="", key=f"{prefixo}codigo")
+        razao = st.text_input("Razão social", value="", key=f"{prefixo}razao")
         cnpj = st.text_input("CNPJ", value="00.000.000/0001-00", key=f"{prefixo}cnpj")
         setor = st.selectbox("Setor", ["Serviços", "Indústria", "Tecnologia", "Logística", "Alimentos", "Energia"], key=f"{prefixo}setor")
         pais = st.text_input("País", value="BR", key=f"{prefixo}pais")
@@ -344,12 +282,6 @@ def tela_login() -> None:
     with st.sidebar:
         st.markdown("<div class='titulo-produto'>ESG Nexus</div><div class='subtitulo-produto'>Configuração de acesso</div>", unsafe_allow_html=True)
         st.session_state["url_api"] = st.text_input("URL da API", value=st.session_state.get("url_api", URL_API_PADRAO))
-        st.session_state["modo_demo"] = st.toggle("Modo demonstração sem API", value=st.session_state.get("modo_demo", False))
-    if st.session_state.get("modo_demo"):
-        st.session_state["autenticado"] = True
-        st.session_state["usuario"] = {"nome": "Usuário Demonstração", "email": "demo@local", "perfil": "administrador"}
-        st.session_state["token"] = "demo"
-        st.rerun()
     aba_login, aba_cadastro = st.tabs(["Entrar", "Cadastrar usuário"])
     with aba_login:
         email = st.text_input("E-mail", key="login_email")
@@ -464,19 +396,13 @@ def render_fornecedores() -> None:
         fornecedor = formulario_fornecedor("cad_")
         if st.button("Salvar fornecedor", type="primary"):
             try:
-                if st.session_state.get("modo_demo"):
-                    st.success("Modo demonstração: fornecedor validado localmente.")
-                else:
-                    resposta = obter_cliente().cadastrar_fornecedor(fornecedor)
-                    st.success(f"Fornecedor cadastrado: {resposta.get('codigo_fornecedor')}")
+                resposta = obter_cliente().cadastrar_fornecedor(fornecedor)
+                st.success(f"Fornecedor cadastrado: {resposta.get('codigo_fornecedor')}")
             except Exception as exc:
                 st.error(f"Falha ao cadastrar fornecedor: {exc}")
     st.subheader("Fornecedores cadastrados")
     try:
-        if st.session_state.get("modo_demo"):
-            st.dataframe(carregar_demo(), use_container_width=True, hide_index=True)
-        else:
-            st.dataframe(pd.DataFrame(obter_cliente().listar_fornecedores()), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(obter_cliente().listar_fornecedores()), use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(f"Falha ao listar fornecedores: {exc}")
 
@@ -487,18 +413,12 @@ def render_classificacao() -> None:
     col1, col2 = st.columns([1, 1])
     if col1.button("Classificar fornecedor", type="primary"):
         try:
-            if st.session_state.get("modo_demo"):
-                st.session_state["ultima_classificacao"] = {"codigo_fornecedor": fornecedor["codigo_fornecedor"], "razao_social": fornecedor["razao_social"], "pontuacao_esg": 76.4, "nivel_risco": "medio", "recomendacao": "Aprovar com plano de melhoria ESG", "probabilidade_ml_alto_risco": 0.28, "pontuacao_ambiental": 72, "pontuacao_social": 81, "pontuacao_governanca": 76, "motivos": ["Boa aderência social", "Governança adequada", "Há espaço para reduzir emissões"]}
-            else:
-                st.session_state["ultima_classificacao"] = obter_cliente().classificar(fornecedor)
+            st.session_state["ultima_classificacao"] = obter_cliente().classificar(fornecedor)
         except Exception as exc:
             st.error(f"Falha na classificação: {exc}")
     if col2.button("Gerar explicabilidade"):
         try:
-            if st.session_state.get("modo_demo"):
-                st.session_state["ultima_explicacao"] = {"avaliacao": st.session_state.get("ultima_classificacao", {}), "fatores": [{"fator": "Política anticorrupção", "impacto": 14, "direcao": "positivo"}, {"fator": "Energia renovável", "impacto": 9, "direcao": "positivo"}, {"fator": "Emissões de carbono", "impacto": -7, "direcao": "negativo"}, {"fator": "Certificações", "impacto": 6, "direcao": "positivo"}]}
-            else:
-                st.session_state["ultima_explicacao"] = obter_cliente().explicar(fornecedor)
+            st.session_state["ultima_explicacao"] = obter_cliente().explicar(fornecedor)
         except Exception as exc:
             st.error(f"Falha na explicabilidade: {exc}")
     avaliacao = st.session_state.get("ultima_classificacao")
@@ -523,7 +443,6 @@ def render_classificacao() -> None:
             coluna_impacto = "impacto" if "impacto" in fatores.columns else fatores.columns[1]
             st.plotly_chart(px.bar(fatores, x=coluna_impacto, y=coluna_fator, orientation="h", title="Fatores que influenciaram a decisão"), use_container_width=True)
             st.dataframe(fatores, use_container_width=True, hide_index=True)
-
 
 
 def render_importacao_lote() -> None:
@@ -568,27 +487,7 @@ def render_importacao_lote() -> None:
     if st.button("Classificar fornecedores em lote", type="primary"):
         fornecedores = dataframe_para_registros_json(df_validado)
         try:
-            if st.session_state.get("modo_demo"):
-                resultados = []
-                servico_demo = montar_payload_executivo_local(carregar_demo())
-                for item in fornecedores:
-                    score = 85 if item.get("possui_politica_anticorrupcao") and not item.get("consta_lista_sancoes") else 45
-                    risco = "baixo" if score >= 70 else "alto"
-                    resultados.append({
-                        "codigo_fornecedor": item["codigo_fornecedor"],
-                        "razao_social": item["razao_social"],
-                        "pontuacao_esg": score,
-                        "nivel_risco": risco,
-                        "recomendacao": "Aprovar" if risco == "baixo" else "Requer plano de ação ESG",
-                        "probabilidade_ml_alto_risco": 0.12 if risco == "baixo" else 0.78,
-                        "pontuacao_ambiental": score,
-                        "pontuacao_social": score,
-                        "pontuacao_governanca": score,
-                        "motivos": ["Resultado demonstrativo"],
-                    })
-                resposta = {"total_processados": len(resultados), "total_erros": 0, "resultados": resultados, "erros": []}
-            else:
-                resposta = obter_cliente().classificar_lote(fornecedores)
+            resposta = obter_cliente().classificar_lote(fornecedores)
             st.session_state["resultado_lote"] = resposta
             st.success(f"Classificação concluída. Processados: {resposta.get('total_processados', 0)}. Erros: {resposta.get('total_erros', 0)}.")
         except Exception as exc:
@@ -679,7 +578,6 @@ def app() -> None:
         st.write(f"**Usuário:** {usuario.get('nome', '-')}")
         st.write(f"**Perfil:** {usuario.get('perfil', '-')}")
         st.session_state["url_api"] = st.text_input("URL da API", value=st.session_state.get("url_api", URL_API_PADRAO))
-        st.session_state["modo_demo"] = st.toggle("Modo demonstração", value=st.session_state.get("modo_demo", False))
         opcoes_menu = paginas_permitidas(str(usuario.get("perfil", "")))
         pagina = st.radio("Navegação", opcoes_menu)
         if st.button("Sair"):
