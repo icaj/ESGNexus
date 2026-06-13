@@ -15,7 +15,7 @@ from typing import Any
 
 import requests
 
-URL_API = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8000"
+URL_API = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://35.212.103.210:8000"
 
 # ── Cores para output ─────────────────────────────────────────────────────────
 OK    = "\033[32m✓\033[0m"
@@ -98,6 +98,58 @@ FORN_ALTO_RISCO = {
 
 TOKEN: str | None = None
 
+ADMIN_EMAIL = "admin@esgnexus.local"
+ADMIN_SENHA = "admin123"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# F0 — Pré-voo: treinar modelos se ausentes
+# ─────────────────────────────────────────────────────────────────────────────
+def _modelos_carregados() -> bool:
+    try:
+        r = requests.get(f"{URL_API}/saude", timeout=10)
+        if r.status_code != 200:
+            return False
+        d = r.json()
+        return all([d.get("modelo_knn_carregado"), d.get("modelo_rf_carregado"),
+                    d.get("config_carregado")])
+    except Exception:
+        return False
+
+
+def preflight_treinar_se_necessario() -> None:
+    if _modelos_carregados():
+        return
+
+    print(f"\n{BOLD}  [pré-voo] Modelos ausentes — disparando treinamento inicial...{RESET}")
+
+    # Login como admin semeado no startup
+    try:
+        r_login = requests.post(f"{URL_API}/auth/login",
+                                json={"email": ADMIN_EMAIL, "senha": ADMIN_SENHA},
+                                timeout=10)
+    except requests.ConnectionError:
+        print(f"  {FAIL} Não foi possível conectar em {URL_API}")
+        sys.exit(1)
+
+    if r_login.status_code != 200:
+        print(f"  {WARN} Login admin falhou ({r_login.status_code}) — treinamento pulado.")
+        print(f"       Verifique USUARIO_ADMIN_EMAIL / USUARIO_ADMIN_SENHA no .env do servidor.")
+        return
+
+    token_admin = r_login.json()["access_token"]
+    r_treinar = requests.post(f"{URL_API}/treinar",
+                              headers={"Authorization": f"Bearer {token_admin}"},
+                              timeout=600)
+    if r_treinar.status_code == 200:
+        print(f"  {OK} Treinamento concluído: {r_treinar.json().get('melhor_modelo','?')}")
+    else:
+        print(f"  {FAIL} POST /treinar retornou {r_treinar.status_code}: {r_treinar.text[:200]}")
+
+    if not _modelos_carregados():
+        print(f"  {WARN} Modelos ainda não visíveis em /saude — aguardando 5s...")
+        time.sleep(5)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # F1 — Saúde da API
@@ -127,7 +179,7 @@ def testar_saude() -> None:
 def testar_auth() -> str | None:
     global TOKEN
     secao("F2 · Autenticação")
-    email = f"teste.funcional.{int(time.time())}@esg.local"
+    email = f"teste.funcional.{int(time.time())}@example.com"
     senha = "Teste@12345"
 
     # Registro
@@ -407,6 +459,7 @@ if __name__ == "__main__":
     print(f"\n{BOLD}ESG Nexus — Testes Funcionais{RESET}")
     print(f"  API: {BOLD}{URL_API}{RESET}\n")
 
+    preflight_treinar_se_necessario()
     testar_saude()
     testar_auth()
     testar_classificacao_individual()
