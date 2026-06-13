@@ -236,16 +236,31 @@ def _classificar_e_persistir(
 
 @roteador.post('/treinar',
                dependencies=[Depends(exigir_perfil('administrador', 'cientista_dados'))])
-def treinar() -> dict:
-    """CRISP-DM Fases 2–6: baixa dados do Kaggle se ausentes, GridSearchCV, critério Fase 5."""
+def treinar(sessao: Session = Depends(obter_sessao)) -> dict:
+    """CRISP-DM Fases 2–6: treina modelos e persiste métricas no banco para o dashboard ML."""
+    from datetime import datetime, timezone
     from esg_ml.aplicacao.servico_treinamento import ServicoTreinamento
     from esg_ml.dominio.servicos.avaliacao import ModeloInsuficienteError
     try:
-        return ServicoTreinamento(repositorio).treinar()
+        resultado = ServicoTreinamento(repositorio).treinar()
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ModeloInsuficienteError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    exp = ExperimentoMLBanco(
+        nome_execucao=f"treino_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+        knn_acuracia=resultado.get('knn_acuracia', 0.0),
+        knn_f1_medium=resultado.get('knn_f1_medium', 0.0),
+        rf_acuracia=resultado.get('rf_acuracia', 0.0),
+        rf_f1_medium=resultado.get('rf_f1_medium', 0.0),
+        knn_params=str(resultado.get('knn_params', '')),
+        rf_params=str(resultado.get('rf_params', '')),
+    )
+    sessao.add(exp)
+    sessao.commit()
+
+    return resultado
 
 
 # ── Cadastro de fornecedor (sem classificação) ────────────────────────────────
