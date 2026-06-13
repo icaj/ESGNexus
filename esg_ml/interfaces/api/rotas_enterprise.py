@@ -291,6 +291,56 @@ def cadastrar_fornecedor(entrada: FornecedorEntrada,
     )
 
 
+# ── Explicabilidade ──────────────────────────────────────────────────────────
+
+def _fatores_explicabilidade(entrada: FornecedorEntrada) -> list[dict]:
+    """Contribuição de cada métrica de entrada para o score ESG (escala 0-100)."""
+    fatores = []
+
+    # Ambiental — baseado em _calcular_scores_esg (escala 0-1000 → /10)
+    if entrada.possui_politica_ambiental:
+        fatores.append({'fator': 'Política ambiental', 'impacto': 25, 'direcao': 'positivo'})
+    energia_imp = round(min(entrada.percentual_energia_renovavel * 0.25, 25), 1)
+    if energia_imp > 0:
+        fatores.append({'fator': 'Energia renovável', 'impacto': energia_imp, 'direcao': 'positivo'})
+    reciclagem_imp = round(min(entrada.percentual_reciclagem_residuos * 0.2, 20), 1)
+    if reciclagem_imp > 0:
+        fatores.append({'fator': 'Reciclagem de resíduos', 'impacto': reciclagem_imp, 'direcao': 'positivo'})
+    emissoes_pen = round(min(entrada.emissoes_carbono_ton / 5000.0, 1.0) * 20, 1)
+    if emissoes_pen > 0:
+        fatores.append({'fator': 'Emissões de carbono', 'impacto': -emissoes_pen, 'direcao': 'negativo'})
+    cert_e = round(min(entrada.quantidade_certificacoes * 2.0, 10), 1)
+    if cert_e > 0:
+        fatores.append({'fator': 'Certificações ESG', 'impacto': cert_e, 'direcao': 'positivo'})
+
+    # Social
+    if entrada.possui_programa_diversidade:
+        fatores.append({'fator': 'Programa de diversidade', 'impacto': 25, 'direcao': 'positivo'})
+    incidentes_pen = round(min(entrada.incidentes_trabalhistas_12m * 4.0, 40), 1)
+    if incidentes_pen > 0:
+        fatores.append({'fator': 'Incidentes trabalhistas', 'impacto': -incidentes_pen, 'direcao': 'negativo'})
+    noticias_s_pen = round(min(entrada.noticias_negativas_12m * 3.5, 35), 1)
+    if noticias_s_pen > 0:
+        fatores.append({'fator': 'Notícias negativas (social)', 'impacto': -noticias_s_pen, 'direcao': 'negativo'})
+
+    # Governança
+    if entrada.possui_politica_privacidade_dados:
+        fatores.append({'fator': 'Política de privacidade de dados', 'impacto': 30, 'direcao': 'positivo'})
+    if entrada.possui_politica_anticorrupcao:
+        fatores.append({'fator': 'Política anticorrupção', 'impacto': 30, 'direcao': 'positivo'})
+    noticias_g_pen = round(min(entrada.noticias_negativas_12m * 2.0, 20), 1)
+    if noticias_g_pen > 0:
+        fatores.append({'fator': 'Notícias negativas (governança)', 'impacto': -noticias_g_pen, 'direcao': 'negativo'})
+    cert_g = round(min(entrada.quantidade_certificacoes * 2.0, 20), 1)
+    if cert_g > 0:
+        fatores.append({'fator': 'Certificações (governança)', 'impacto': cert_g, 'direcao': 'positivo'})
+    if entrada.consta_lista_sancoes:
+        fatores.append({'fator': 'Consta em lista de sanções', 'impacto': -50, 'direcao': 'negativo'})
+
+    fatores.sort(key=lambda f: abs(f['impacto']), reverse=True)
+    return fatores
+
+
 # ── Classificação individual ──────────────────────────────────────────────────
 
 @roteador.post('/classificar', response_model=AvaliacaoSaida,
@@ -305,6 +355,29 @@ def classificar(entrada: FornecedorEntrada,
         return resultado
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@roteador.post('/explicabilidade',
+               dependencies=[Depends(obter_usuario_atual)])
+def explicabilidade(entrada: FornecedorEntrada) -> dict:
+    """Retorna a classificação ESG e os fatores que influenciaram a decisão."""
+    ausentes = [n for n in ('modelo_knn', 'modelo_rf', 'config') if not repositorio.existe(n)]
+    if ausentes:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Modelos ausentes: {ausentes}. Execute: POST /treinar",
+        )
+    try:
+        servico = ServicoAvaliacao(repositorio)
+        d = servico.avaliar_um(_dominio(entrada))
+        avaliacao = _saida(d, entrada)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {
+        'avaliacao': avaliacao.model_dump(),
+        'fatores': _fatores_explicabilidade(entrada),
+    }
 
 
 # ── Classificação em lote ─────────────────────────────────────────────────────
