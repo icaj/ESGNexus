@@ -6,7 +6,32 @@ import os
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
+# URL da API dentro da rede Docker; sobreposta por ESG_NEXUS_API_URL no .env
 URL_API = os.getenv("ESG_NEXUS_API_URL", "http://api:8000")
+
+# Credenciais da conta de serviço do Airflow — definir no .env do servidor
+# ESG_ADMIN_EMAIL e ESG_ADMIN_SENHA devem pertencer a um usuário administrador
+# ou cientista_dados criado previamente via POST /auth/registrar.
+ADMIN_EMAIL = os.getenv("ESG_ADMIN_EMAIL", "admin@esg.local")
+ADMIN_SENHA  = os.getenv("ESG_ADMIN_SENHA",  "admin@ESG2026!")
+
+# Script bash: obtém JWT → chama /treinar com autenticação
+_SCRIPT_TREINAR = f"""
+set -e
+echo "[1/2] Autenticando na API..."
+TOKEN=$(curl -sf -X POST {URL_API}/auth/login \\
+  -H "Content-Type: application/json" \\
+  -d '{{"email":"{ADMIN_EMAIL}","senha":"{ADMIN_SENHA}"}}' \\
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+echo "Token obtido."
+
+echo "[2/2] Disparando treinamento ESG (CRISP-DM)..."
+curl -sf -X POST {URL_API}/treinar \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  | python3 -m json.tool
+echo "Treinamento concluído."
+"""
 
 with DAG(
     dag_id="dag_treinamento_esg",
@@ -14,20 +39,39 @@ with DAG(
     schedule="0 2 * * *",
     catchup=False,
     tags=["esg", "machine-learning", "fornecedores"],
+    doc_md="""
+## DAG Treinamento ESG
+
+Re-treina os modelos KNN e Random Forest diariamente às 02:00.
+
+**Pré-requisitos (primeira execução):**
+1. Criar conta de serviço via `POST /auth/registrar` com perfil `administrador`
+2. Definir `ESG_ADMIN_EMAIL` e `ESG_ADMIN_SENHA` no `.env` do servidor
+3. Garantir que o arquivo `data/raw/data.csv` (Kaggle ESG) esteja disponível
+
+**Fluxo:** verificar_api → treinar_modelo_esg
+""",
 ) as dag:
+
     verificar_api = BashOperator(
         task_id="verificar_api",
-        bash_command=f"curl --fail --silent {URL_API}/saude",
+        bash_command=(
+            f"curl --fail --silent {URL_API}/saude "
+            "| python3 -c \""
+            "import sys,json; d=json.load(sys.stdin); "
+            "ok=all(d.values()); "
+            "print('Modelos carregados:', d); "
+            "exit(0 if ok else 1)"
+            "\""
+        ),
+        doc_md="Verifica se a API está online **e** se os modelos ML estão carregados.",
     )
 
     treinar_modelo = BashOperator(
         task_id="treinar_modelo_esg",
-        bash_command=f"curl --fail --silent -X POST {URL_API}/treinar",
+        bash_command=_SCRIPT_TREINAR,
+        execution_timeout=None,  # treinamento pode demorar vários minutos
+        doc_md="Autentica com JWT e chama POST /treinar (CRISP-DM Fases 2–6).",
     )
 
-    gerar_dashboards = BashOperator(
-        task_id="gerar_dashboards_html",
-        bash_command=f"curl --fail --silent -X POST {URL_API}/dashboards/gerar",
-    )
-
-    verificar_api >> treinar_modelo >> gerar_dashboards
+    verificar_api >> treinar_modelo
