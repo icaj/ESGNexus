@@ -24,9 +24,12 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       DIRETORIO_ARTEFATOS: /app/artifacts
+      MPLCONFIGDIR: /tmp/matplotlib
+      GIT_PYTHON_REFRESH: quiet
     volumes:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
+      - mlflow_artifacts:/mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,9 +43,12 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       DIRETORIO_ARTEFATOS: /app/artifacts
+      MPLCONFIGDIR: /tmp/matplotlib
+      GIT_PYTHON_REFRESH: quiet
     volumes:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
+      - mlflow_artifacts:/mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
