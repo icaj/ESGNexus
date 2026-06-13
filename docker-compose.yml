@@ -29,7 +29,7 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
-      - mlflow_artifacts:/mlflow/artifacts
+      - ./artifacts/mlflow:/mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,7 +48,7 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
-      - mlflow_artifacts:/mlflow/artifacts
+      - ./artifacts/mlflow:/mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,7 +59,7 @@ services:
 
   frontend-streamlit:
     build: .
-    command: streamlit run frontend/frontend/app.py --server.address 0.0.0.0 --server.port 8501  # BUG 3 corrigido
+    command: streamlit run frontend/frontend/app.py --server.address 0.0.0.0 --server.port 8501
     ports:
       - "8501:8501"
     env_file: .env
@@ -82,7 +82,7 @@ services:
       - "5000:5000"
     env_file: .env
     volumes:
-      - mlflow_artifacts:/mlflow/artifacts
+      - ./artifacts/mlflow:/mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,7 +92,7 @@ services:
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
@@ -113,7 +113,7 @@ services:
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       ESG_NEXUS_API_URL: http://api:8000
     command: webserver
@@ -130,7 +130,7 @@ services:
     env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"  # BUG 1 corrigido
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://esg:esg@postgres:5432/esg_nexus"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       ESG_NEXUS_API_URL: http://api:8000
     command: scheduler
@@ -139,5 +139,3 @@ services:
 
 volumes:
   postgres_data:
-  mlflow_artifacts:
-  
