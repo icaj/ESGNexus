@@ -242,11 +242,9 @@ def treinar() -> dict:
     from esg_ml.dominio.servicos.avaliacao import ModeloInsuficienteError
     try:
         return ServicoTreinamento(repositorio).treinar()
-    except (RuntimeError, FileNotFoundError) as exc:
-        # dataset ausente ou credenciais Kaggle não configuradas
+    except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ModeloInsuficienteError as exc:
-        # modelos treinados mas métricas abaixo do critério
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 

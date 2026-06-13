@@ -1,5 +1,5 @@
 # ESG Nexus Enterprise — Merged (nexus_v2 + Enterprise)
-# Pipeline ML: KNN + Random Forest (GridSearchCV), dados ESG Enterprise (Kaggle)
+# Pipeline ML: KNN + Random Forest (GridSearchCV), base ESG tratada em data/raw/data.csv
 # Infraestrutura: FastAPI, NeonDB (PostgreSQL), JWT, Docker, MLflow, Airflow
 
 # ── API e servidor ─────────────────────────────────────────────────
@@ -22,9 +22,6 @@ pandas>=2.2
 numpy>=1.24
 scikit-learn>=1.4
 joblib>=1.4
-
-# ── Dados ESG Enterprise (Kaggle) ─────────────────────────────────
-kagglehub>=0.2
 
 # ── Dashboard e visualização ──────────────────────────────────────
 streamlit>=1.36
