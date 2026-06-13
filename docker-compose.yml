@@ -64,6 +64,7 @@ services:
     environment:
       ESG_NEXUS_API_URL: http://api:8000
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URL: ${MLFLOW_TRACKING_URI:-http://localhost:5000}
     volumes:
       - ./data:/app/data
     depends_on:
