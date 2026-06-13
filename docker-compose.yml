@@ -23,6 +23,7 @@ services:
     env_file: .env
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      DIRETORIO_ARTEFATOS: /app/artifacts
     volumes:
       - ./artifacts:/app/artifacts
       - ./data:/app/data
@@ -31,6 +32,24 @@ services:
         condition: service_healthy
       mlflow:
         condition: service_started
+
+  trainer:
+    build: .
+    command: python treinar_modelo.py
+    env_file: .env
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DIRETORIO_ARTEFATOS: /app/artifacts
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    profiles:
+      - training
 
   frontend-streamlit:
     build: .

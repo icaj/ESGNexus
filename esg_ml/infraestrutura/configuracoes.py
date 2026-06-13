@@ -2,12 +2,16 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Raiz do projeto: dois níveis acima de esg_ml/infraestrutura/configuracoes.py
+# Garante caminho absoluto independente do CWD ao executar scripts fora do Docker.
+_RAIZ_PROJETO = Path(__file__).resolve().parents[2]
+
 
 class Configuracoes(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
     nome_aplicacao:      str  = 'ESG Nexus Enterprise'
-    diretorio_artefatos: Path = Path('artifacts')
+    diretorio_artefatos: Path = _RAIZ_PROJETO / 'artifacts'
 
     # Caminhos derivados (nexus_v2)
     @property
