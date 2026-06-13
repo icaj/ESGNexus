@@ -67,6 +67,9 @@ def obter_sessao() -> Generator[Session, None, None]:
     sessao = SessaoLocal()
     try:
         yield sessao
+    except Exception:
+        sessao.rollback()
+        raise
     finally:
         sessao.close()
 

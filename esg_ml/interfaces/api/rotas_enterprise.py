@@ -295,7 +295,9 @@ def classificar_lote(entrada: ClassificacaoLoteEntrada,
 
     for idx, forn in enumerate(entrada.fornecedores, 1):
         try:
-            resultado = _classificar_e_persistir(sessao, forn, servico)
+            # SAVEPOINT por linha: falha de uma linha não quebra a sessão das demais
+            with sessao.begin_nested():
+                resultado = _classificar_e_persistir(sessao, forn, servico)
             resultados.append(resultado)
         except Exception as exc:
             erros.append({
@@ -339,6 +341,20 @@ async def avaliar_upload(
         tmp.write(await arquivo.read())
         tmp_path = Path(tmp.name)
 
+    def _safe_float(v: object, default: float = 0.0) -> float:
+        try:
+            r = float(v)  # type: ignore[arg-type]
+            return default if pd.isna(r) else r
+        except (TypeError, ValueError):
+            return default
+
+    def _safe_int(v: object, default: int = 0) -> int:
+        try:
+            r = float(v)  # type: ignore[arg-type]
+            return default if pd.isna(r) else int(r)
+        except (TypeError, ValueError):
+            return default
+
     try:
         df = (pd.read_csv(tmp_path)
               if sufixo.lower() == '.csv'
@@ -364,30 +380,34 @@ async def avaliar_upload(
 
         for _, row in df.iterrows():
             forn = FornecedorEntrada(
-                codigo_fornecedor              = str(row.get('codigo_fornecedor', '')),
-                razao_social                   = str(row.get('razao_social', '')),
-                cnpj                           = str(row.get('cnpj', '')),
-                setor                          = str(row.get('setor', '')),
-                pais                           = str(row.get('pais', 'BR')),
+                codigo_fornecedor              = str(row.get('codigo_fornecedor', '') or ''),
+                razao_social                   = str(row.get('razao_social', '') or ''),
+                cnpj                           = str(row.get('cnpj', '') or ''),
+                setor                          = str(row.get('setor', '') or ''),
+                pais                           = str(row.get('pais', 'BR') or 'BR'),
                 possui_politica_ambiental      = bool(row.get('possui_politica_ambiental', False)),
-                emissoes_carbono_ton           = float(row.get('emissoes_carbono_ton', 0)),
-                percentual_energia_renovavel   = float(row.get('percentual_energia_renovavel', 0)),
-                percentual_reciclagem_residuos = float(row.get('percentual_reciclagem_residuos', 0)),
-                incidentes_trabalhistas_12m    = int(row.get('incidentes_trabalhistas_12m', 0)),
+                emissoes_carbono_ton           = _safe_float(row.get('emissoes_carbono_ton', 0)),
+                percentual_energia_renovavel   = _safe_float(row.get('percentual_energia_renovavel', 0)),
+                percentual_reciclagem_residuos = _safe_float(row.get('percentual_reciclagem_residuos', 0)),
+                incidentes_trabalhistas_12m    = _safe_int(row.get('incidentes_trabalhistas_12m', 0)),
                 possui_programa_diversidade    = bool(row.get('possui_programa_diversidade', False)),
                 possui_politica_privacidade_dados = bool(row.get('possui_politica_privacidade_dados', False)),
                 possui_politica_anticorrupcao  = bool(row.get('possui_politica_anticorrupcao', False)),
                 consta_lista_sancoes           = bool(row.get('consta_lista_sancoes', False)),
-                noticias_negativas_12m         = int(row.get('noticias_negativas_12m', 0)),
-                quantidade_certificacoes       = int(row.get('quantidade_certificacoes', 0)),
-                receita_anual                  = float(row.get('receita_anual', 0)),
+                noticias_negativas_12m         = _safe_int(row.get('noticias_negativas_12m', 0)),
+                quantidade_certificacoes       = _safe_int(row.get('quantidade_certificacoes', 0)),
+                receita_anual                  = _safe_float(row.get('receita_anual', 0)),
             )
-            resultados.append(_classificar_e_persistir(sessao, forn, servico))
+            # SAVEPOINT por linha: erro de DB não contamina a sessão das linhas seguintes
+            with sessao.begin_nested():
+                resultados.append(_classificar_e_persistir(sessao, forn, servico))
 
         sessao.commit()
         return resultados
 
-    except ValueError as exc:
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
         tmp_path.unlink(missing_ok=True)
