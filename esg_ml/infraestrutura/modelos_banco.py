@@ -168,14 +168,18 @@ class PlanoAcaoBanco(Base):
 
 class ExperimentoMLBanco(Base):
     __tablename__ = 'experimentos_ml'
-    id:             Mapped[int]      = mapped_column(Integer, primary_key=True)
-    nome_execucao:  Mapped[str]      = mapped_column(String(120), nullable=False)
-    knn_acuracia:   Mapped[float]    = mapped_column(Float, default=0)
-    knn_f1_medium:  Mapped[float]    = mapped_column(Float, default=0)
-    rf_acuracia:    Mapped[float]    = mapped_column(Float, default=0)
-    rf_f1_medium:   Mapped[float]    = mapped_column(Float, default=0)
-    knn_params:     Mapped[str]      = mapped_column(Text, nullable=True)
-    rf_params:      Mapped[str]      = mapped_column(Text, nullable=True)
-    mlflow_run_id:  Mapped[str|None] = mapped_column(String(120), nullable=True)
-    criado_em:      Mapped[datetime] = mapped_column(DateTime(timezone=True),
-                                                      default=lambda: datetime.now(timezone.utc))
+    id:              Mapped[int]         = mapped_column(Integer, primary_key=True)
+    nome_execucao:   Mapped[str]         = mapped_column(String(120), nullable=False)
+    knn_acuracia:    Mapped[float]       = mapped_column(Float, default=0)
+    knn_f1_medium:   Mapped[float]       = mapped_column(Float, default=0)
+    knn_precision:   Mapped[float|None]  = mapped_column(Float, nullable=True)
+    knn_recall:      Mapped[float|None]  = mapped_column(Float, nullable=True)
+    rf_acuracia:     Mapped[float]       = mapped_column(Float, default=0)
+    rf_f1_medium:    Mapped[float]       = mapped_column(Float, default=0)
+    rf_precision:    Mapped[float|None]  = mapped_column(Float, nullable=True)
+    rf_recall:       Mapped[float|None]  = mapped_column(Float, nullable=True)
+    knn_params:      Mapped[str]         = mapped_column(Text, nullable=True)
+    rf_params:       Mapped[str]         = mapped_column(Text, nullable=True)
+    mlflow_run_id:   Mapped[str|None]    = mapped_column(String(120), nullable=True)
+    criado_em:       Mapped[datetime]    = mapped_column(DateTime(timezone=True),
+                                                          default=lambda: datetime.now(timezone.utc))

@@ -181,12 +181,16 @@ class ServicoTreinamento:
         print('╚══════════════════════════════════════════════════════════╝')
 
         return {
-            'knn_acuracia': metricas['knn']['accuracy'],
+            'knn_acuracia':  metricas['knn']['accuracy'],
             'knn_f1_medium': metricas['knn']['f1_medium'],
-            'rf_acuracia': metricas['rf']['accuracy'],
-            'rf_f1_medium': metricas['rf']['f1_medium'],
-            'knn_params': str(resultado['knn_params']),
-            'rf_params':  str(resultado['rf_params']),
+            'knn_precision': metricas['knn']['precision_macro'],
+            'knn_recall':    metricas['knn']['recall_macro'],
+            'rf_acuracia':   metricas['rf']['accuracy'],
+            'rf_f1_medium':  metricas['rf']['f1_medium'],
+            'rf_precision':  metricas['rf']['precision_macro'],
+            'rf_recall':     metricas['rf']['recall_macro'],
+            'knn_params':    str(resultado['knn_params']),
+            'rf_params':     str(resultado['rf_params']),
         }
 
     def _registrar_mlflow(self, resultado: dict, metricas: dict, graficos: list) -> None:

@@ -252,8 +252,12 @@ def treinar(sessao: Session = Depends(obter_sessao)) -> dict:
         nome_execucao=f"treino_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
         knn_acuracia=resultado.get('knn_acuracia', 0.0),
         knn_f1_medium=resultado.get('knn_f1_medium', 0.0),
+        knn_precision=resultado.get('knn_precision'),
+        knn_recall=resultado.get('knn_recall'),
         rf_acuracia=resultado.get('rf_acuracia', 0.0),
         rf_f1_medium=resultado.get('rf_f1_medium', 0.0),
+        rf_precision=resultado.get('rf_precision'),
+        rf_recall=resultado.get('rf_recall'),
         knn_params=str(resultado.get('knn_params', '')),
         rf_params=str(resultado.get('rf_params', '')),
     )
@@ -734,10 +738,10 @@ def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
                   .order_by(ExperimentoMLBanco.criado_em.desc()).first())
     if ultimo_exp:
         metricas = {
-            'accuracy':  round(float(ultimo_exp.rf_acuracia),  3),
-            'precision': round(float(ultimo_exp.rf_acuracia),  3),
-            'recall':    round(float(ultimo_exp.rf_acuracia),  3),
-            'f1':        round(float(ultimo_exp.rf_f1_medium), 3),
+            'accuracy':  round(float(ultimo_exp.rf_acuracia),                      3),
+            'precision': round(float(ultimo_exp.rf_precision or ultimo_exp.rf_acuracia), 3),
+            'recall':    round(float(ultimo_exp.rf_recall    or ultimo_exp.rf_acuracia), 3),
+            'f1':        round(float(ultimo_exp.rf_f1_medium),                     3),
         }
     else:
         try:

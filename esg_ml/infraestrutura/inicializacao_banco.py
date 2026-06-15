@@ -47,6 +47,26 @@ def _criar_usuario_se_ausente(
 
 # ── API pública ───────────────────────────────────────────────────────────────
 
+def _migrar_experimentos_ml() -> None:
+    """Adiciona colunas de precisão/recall à tabela experimentos_ml sem perder dados."""
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    if not insp.has_table('experimentos_ml'):
+        return
+    existentes = {c['name'] for c in insp.get_columns('experimentos_ml')}
+    novas = {
+        'rf_precision':  'DOUBLE PRECISION',
+        'rf_recall':     'DOUBLE PRECISION',
+        'knn_precision': 'DOUBLE PRECISION',
+        'knn_recall':    'DOUBLE PRECISION',
+    }
+    with engine.begin() as conn:
+        for col, tipo in novas.items():
+            if col not in existentes:
+                conn.execute(text(f'ALTER TABLE experimentos_ml ADD COLUMN {col} {tipo}'))
+                registrador.info('coluna_adicionada', tabela='experimentos_ml', coluna=col)
+
+
 def semear_banco() -> None:
     """Cria tabelas e seeds de usuários padrão.
 
@@ -55,7 +75,8 @@ def semear_banco() -> None:
     """
     registrador.info('semear_banco_inicio', banco=obter_url_banco_mascarada())
 
-    # 1) Cria tabelas se não existirem
+    # 1) Cria tabelas se não existirem; migra colunas novas em tabelas existentes
+    _migrar_experimentos_ml()
     criar_tabelas()
 
     with SessaoLocal() as sessao:
@@ -125,6 +146,7 @@ def executar() -> None:
         print('Recriando tabelas (drop all)...')
         Base.metadata.drop_all(bind=engine)
 
+    _migrar_experimentos_ml()
     criar_tabelas()
     print('Tabelas criadas/verificadas.')
 
