@@ -380,16 +380,21 @@ def render_dashboard_executivo() -> None:
             col_g1, col_g2 = st.columns(2)
             with col_g1:
                 if {"pontuacao_esg", "risco", "maturidade_rf", "razao_social"}.issubset(resumo.columns):
-                    st.plotly_chart(
-                        px.scatter(
-                            resumo,
-                            x="pontuacao_esg", y="risco",
-                            color="maturidade_rf", text="razao_social",
-                            labels={"pontuacao_esg": "Score ESG (0-100)", "risco": "Risco"},
-                            title="Score ESG × Risco por fornecedor",
-                        ),
-                        use_container_width=True,
+                    _fig_scatter = px.scatter(
+                        resumo,
+                        x="pontuacao_esg", y="risco",
+                        color="maturidade_rf",
+                        hover_name="razao_social",
+                        hover_data={"pontuacao_esg": True, "risco": True, "maturidade_rf": True},
+                        labels={"pontuacao_esg": "Score ESG (0-100)", "risco": "Risco", "maturidade_rf": "Maturidade"},
+                        title="Score ESG × Risco por fornecedor",
                     )
+                    _fig_scatter.update_traces(marker=dict(size=10, opacity=0.8))
+                    _fig_scatter.update_layout(
+                        height=420,
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    )
+                    st.plotly_chart(_fig_scatter, use_container_width=True)
             with col_g2:
                 if {"risco", "razao_social", "maturidade_rf"}.issubset(resumo.columns):
                     st.plotly_chart(
