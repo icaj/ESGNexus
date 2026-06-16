@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """Entry point: treina os modelos ESG com dados Kaggle (CRISP-DM Fases 2–6)."""
-import argparse
 from datetime import datetime, timezone
 
 from esg_ml.aplicacao.servico_treinamento import ServicoTreinamento
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--mlflow', action='store_true', help='Registrar no MLflow')
-    args = parser.parse_args()
-
-    metricas = ServicoTreinamento().treinar(usar_mlflow=args.mlflow)
+    metricas = ServicoTreinamento().treinar()
 
     from esg_ml.infraestrutura.banco_dados import SessaoLocal
     from esg_ml.infraestrutura.modelos_banco import ExperimentoMLBanco

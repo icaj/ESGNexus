@@ -738,10 +738,10 @@ def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
                   .order_by(ExperimentoMLBanco.criado_em.desc()).first())
     if ultimo_exp:
         metricas = {
-            'accuracy':  round(float(ultimo_exp.rf_acuracia),                      3),
-            'precision': round(float(ultimo_exp.rf_precision or ultimo_exp.rf_acuracia), 3),
-            'recall':    round(float(ultimo_exp.rf_recall    or ultimo_exp.rf_acuracia), 3),
-            'f1':        round(float(ultimo_exp.rf_f1_medium),                     3),
+            'accuracy':  round(float(ultimo_exp.rf_acuracia), 3),
+            'precision': round(float(ultimo_exp.rf_precision if ultimo_exp.rf_precision is not None else ultimo_exp.rf_acuracia), 3),
+            'recall':    round(float(ultimo_exp.rf_recall    if ultimo_exp.rf_recall    is not None else ultimo_exp.rf_acuracia), 3),
+            'f1':        round(float(ultimo_exp.rf_f1_medium), 3),
         }
     else:
         try:

@@ -86,11 +86,8 @@ class ServicoTreinamento:
     def __init__(self, repositorio: RepositorioModeloJoblib = None) -> None:
         self.repositorio = repositorio or RepositorioModeloJoblib(conf.diretorio_artefatos)
 
-    def treinar(self, fornecedores=None, usar_mlflow: bool = False) -> dict:
-        """
-        Executa CRISP-DM Fases 2–6.
-        O parâmetro `fornecedores` é ignorado — os dados vêm do Kaggle (nexus_v2).
-        """
+    def treinar(self, fornecedores=None) -> dict:
+        """Executa CRISP-DM Fases 2–6. Dados do Kaggle; MLflow sempre registrado."""
         print('╔══════════════════════════════════════════════════════════╗')
         print('║  PIPELINE ESG — CRISP-DM + Arquitetura Hexagonal         ║')
         print('╚══════════════════════════════════════════════════════════╝')
@@ -168,9 +165,7 @@ class ServicoTreinamento:
             'min_empresas_peso': 5,
         })
 
-        # MLflow opcional
-        if usar_mlflow:
-            self._registrar_mlflow(resultado, metricas, graficos)
+        self._registrar_mlflow(resultado, metricas, graficos)
 
         registrador.info('treino_concluido',
                          knn_acc=metricas['knn']['accuracy'],
