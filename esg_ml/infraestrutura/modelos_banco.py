@@ -183,3 +183,38 @@ class ExperimentoMLBanco(Base):
     mlflow_run_id:   Mapped[str|None]    = mapped_column(String(120), nullable=True)
     criado_em:       Mapped[datetime]    = mapped_column(DateTime(timezone=True),
                                                           default=lambda: datetime.now(timezone.utc))
+
+
+class LogImportacaoFornecedorBanco(Base):
+    """Log de importações de fornecedores — populado via stored procedure sp_registrar_importacao."""
+    __tablename__ = 'log_importacoes_fornecedores'
+
+    id:            Mapped[int]        = mapped_column(Integer, Identity(always=False), primary_key=True)
+    data_hora:     Mapped[datetime]   = mapped_column(DateTime(timezone=True),
+                                                       default=lambda: datetime.now(timezone.utc))
+    fornecedor_id: Mapped[int | None] = mapped_column(Integer,
+                                                       ForeignKey('fornecedores.id', ondelete='SET NULL'),
+                                                       nullable=True, index=True)
+    razao_social:  Mapped[str | None] = mapped_column(String(220), nullable=True)
+    cnpj:          Mapped[str | None] = mapped_column(String(20),  nullable=True)
+    usuario_id:    Mapped[int | None] = mapped_column(Integer,
+                                                       ForeignKey('usuarios.id', ondelete='SET NULL'),
+                                                       nullable=True)
+    usuario_email: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    operacao:      Mapped[str]        = mapped_column(String(20),  nullable=False, default='importacao')
+    lote_id:       Mapped[str | None] = mapped_column(String(36),  nullable=True, index=True)
+    detalhes:      Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class LogAlteracaoFornecedorBanco(Base):
+    """Auditoria de alterações na tabela fornecedores — populado via trigger trg_audit_fornecedores."""
+    __tablename__ = 'log_alteracoes_fornecedores'
+
+    id:               Mapped[int]        = mapped_column(Integer, Identity(always=False), primary_key=True)
+    data_hora:        Mapped[datetime]   = mapped_column(DateTime(timezone=True),
+                                                          default=lambda: datetime.now(timezone.utc))
+    fornecedor_id:    Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    operacao:         Mapped[str]        = mapped_column(String(10), nullable=False)
+    dados_anteriores: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dados_novos:      Mapped[str | None] = mapped_column(Text, nullable=True)
+    usuario_bd:       Mapped[str | None] = mapped_column(String(120), nullable=True)

@@ -4,6 +4,7 @@
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from esg_ml.adaptadores.saida.repositorio_modelo_joblib import RepositorioModeloJoblib
@@ -13,7 +14,7 @@ from esg_ml.dominio.entidades.diagnostico import DiagnosticoESG
 from esg_ml.infraestrutura.banco_dados import obter_sessao
 from esg_ml.infraestrutura.configuracoes import Configuracoes
 from esg_ml.infraestrutura.modelos_banco import (
-    AvaliacaoBanco, ExperimentoMLBanco, FornecedorBanco, PlanoAcaoBanco)
+    AvaliacaoBanco, ExperimentoMLBanco, FornecedorBanco, PlanoAcaoBanco, UsuarioBanco)
 from esg_ml.interfaces.api.dependencias_auth import exigir_perfil, obter_usuario_atual
 from esg_ml.interfaces.api.esquemas import (
     AvaliacaoSaida,
@@ -222,10 +223,21 @@ def _classificar_e_persistir(
     sessao: Session,
     entrada: FornecedorEntrada,
     servico: ServicoAvaliacao,
+    *,
+    usuario_id: int | None = None,
+    usuario_email: str | None = None,
+    lote_id: str | None = None,
+    operacao: str = 'importacao',
 ) -> AvaliacaoSaida:
     d        = servico.avaliar_um(_dominio(entrada))
     forn     = _persistir_fornecedor(sessao, entrada)
     sessao.flush()
+    if usuario_id is not None:
+        sessao.execute(
+            text("CALL sp_registrar_importacao(:fid, :rs, :cnpj, :uid, :uemail, :op, :lote, NULL)"),
+            {'fid': forn.id, 'rs': forn.name, 'cnpj': forn.cnpj,
+             'uid': usuario_id, 'uemail': usuario_email, 'op': operacao, 'lote': lote_id},
+        )
     av_banco = _persistir_avaliacao(sessao, d, forn.id)
     sessao.flush()
     _persistir_plano_acao(sessao, d, av_banco.id, forn.id)
@@ -269,13 +281,20 @@ def treinar(sessao: Session = Depends(obter_sessao)) -> dict:
 
 # ── Cadastro de fornecedor (sem classificação) ────────────────────────────────
 
-@roteador.post('/fornecedores', response_model=FornecedorSaida,
-               dependencies=[Depends(obter_usuario_atual)])
-def cadastrar_fornecedor(entrada: FornecedorEntrada,
-                         sessao: Session = Depends(obter_sessao)) -> FornecedorSaida:
+@roteador.post('/fornecedores', response_model=FornecedorSaida)
+def cadastrar_fornecedor(
+    entrada: FornecedorEntrada,
+    sessao: Session = Depends(obter_sessao),
+    usuario: UsuarioBanco = Depends(obter_usuario_atual),
+) -> FornecedorSaida:
     """Cadastra ou atualiza fornecedor sem executar classificação ML."""
     forn = _persistir_fornecedor(sessao, entrada)
     sessao.flush()
+    sessao.execute(
+        text("CALL sp_registrar_importacao(:fid, :rs, :cnpj, :uid, :uemail, 'criacao', NULL, NULL)"),
+        {'fid': forn.id, 'rs': forn.name, 'cnpj': forn.cnpj,
+         'uid': usuario.id, 'uemail': usuario.email},
+    )
     sessao.commit()
     total = sessao.query(AvaliacaoBanco).filter(
         AvaliacaoBanco.fornecedor_id == forn.id).count()
@@ -386,13 +405,17 @@ def explicabilidade(entrada: FornecedorEntrada) -> dict:
 
 # ── Classificação em lote ─────────────────────────────────────────────────────
 
-@roteador.post('/classificar/lote', response_model=ResultadoClassificacaoLote,
-               dependencies=[Depends(obter_usuario_atual)])
-def classificar_lote(entrada: ClassificacaoLoteEntrada,
-                     sessao: Session = Depends(obter_sessao)) -> ResultadoClassificacaoLote:
+@roteador.post('/classificar/lote', response_model=ResultadoClassificacaoLote)
+def classificar_lote(
+    entrada: ClassificacaoLoteEntrada,
+    sessao: Session = Depends(obter_sessao),
+    usuario: UsuarioBanco = Depends(obter_usuario_atual),
+) -> ResultadoClassificacaoLote:
     """Classifica lista de fornecedores com rastreamento de erros por linha."""
-    servico        = ServicoAvaliacao(repositorio)
+    import uuid
+    servico           = ServicoAvaliacao(repositorio)
     resultados, erros = [], []
+    lote_id           = str(uuid.uuid4())
 
     ausentes = [n for n in ('modelo_knn', 'modelo_rf', 'config') if not repositorio.existe(n)]
     if ausentes:
@@ -405,7 +428,11 @@ def classificar_lote(entrada: ClassificacaoLoteEntrada,
         try:
             # SAVEPOINT por linha: falha de uma linha não quebra a sessão das demais
             with sessao.begin_nested():
-                resultado = _classificar_e_persistir(sessao, forn, servico)
+                resultado = _classificar_e_persistir(
+                    sessao, forn, servico,
+                    usuario_id=usuario.id, usuario_email=usuario.email,
+                    lote_id=lote_id, operacao='lote',
+                )
             resultados.append(resultado)
         except Exception as exc:
             erros.append({
@@ -426,11 +453,11 @@ def classificar_lote(entrada: ClassificacaoLoteEntrada,
 
 # ── Upload de arquivo ─────────────────────────────────────────────────────────
 
-@roteador.post('/avaliar/upload', response_model=list[AvaliacaoSaida],
-               dependencies=[Depends(obter_usuario_atual)])
+@roteador.post('/avaliar/upload', response_model=list[AvaliacaoSaida])
 async def avaliar_upload(
     arquivo: UploadFile = File(...),
     sessao: Session = Depends(obter_sessao),
+    usuario: UsuarioBanco = Depends(obter_usuario_atual),
 ) -> list[AvaliacaoSaida]:
     """Upload CSV/XLSX com 17 colunas PT — classifica todos os fornecedores do arquivo.
 
@@ -491,8 +518,10 @@ async def avaliar_upload(
             if col in df.columns:
                 df[col] = df[col].map(_conv_bool)
 
+        import uuid
         servico    = ServicoAvaliacao(repositorio)
         resultados: list[AvaliacaoSaida] = []
+        lote_id    = str(uuid.uuid4())
 
         for _, row in df.iterrows():
             forn = FornecedorEntrada(
@@ -516,7 +545,11 @@ async def avaliar_upload(
             )
             # SAVEPOINT por linha: erro de DB não contamina a sessão das linhas seguintes
             with sessao.begin_nested():
-                resultados.append(_classificar_e_persistir(sessao, forn, servico))
+                resultados.append(_classificar_e_persistir(
+                    sessao, forn, servico,
+                    usuario_id=usuario.id, usuario_email=usuario.email,
+                    lote_id=lote_id, operacao='upload',
+                ))
 
         sessao.commit()
         return resultados
