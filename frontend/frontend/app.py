@@ -209,10 +209,10 @@ def gerar_excel_resultado(df_resultado: pd.DataFrame, df_erros: pd.DataFrame | N
 
 def paginas_permitidas(perfil: str) -> list[str]:
     mapa = {
-        "administrador":   ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade", "Dashboard de Machine Learning", "Operação ML/Airflow/MLflow"],
-        "gerente_esg":     ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
-        "analista_esg":    ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
-        "operador_esg":    ["Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
+        "administrador":   ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Fornecedores e Planos de Ação", "Classificação e Explicabilidade", "Dashboard de Machine Learning", "Operação ML/Airflow/MLflow"],
+        "gerente_esg":     ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Fornecedores e Planos de Ação", "Classificação e Explicabilidade"],
+        "analista_esg":    ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Fornecedores e Planos de Ação", "Classificação e Explicabilidade"],
+        "operador_esg":    ["Importação e Classificação em Lote", "Fornecedores", "Fornecedores e Planos de Ação", "Classificação e Explicabilidade"],
         "cientista_dados": ["Dashboard Estatístico", "Dashboard de Machine Learning", "Classificação e Explicabilidade", "Operação ML/Airflow/MLflow"],
     }
     return mapa.get(perfil, ["Dashboard Executivo ESG"])
@@ -592,6 +592,48 @@ def render_fornecedores() -> None:
         st.dataframe(pd.DataFrame(obter_cliente().listar_fornecedores()), use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(f"Falha ao listar fornecedores: {exc}")
+
+
+def render_fornecedores_planos_acao() -> None:
+    st.header("Fornecedores e Planos de Ação")
+    st.markdown("<div class='painel-info'>Selecione um fornecedor para visualizar o plano de ação gerado a partir da avaliação ESG mais recente.</div>", unsafe_allow_html=True)
+
+    try:
+        fornecedores = obter_cliente().listar_fornecedores()
+    except Exception as exc:
+        st.error(f"Falha ao listar fornecedores: {exc}")
+        return
+
+    if not fornecedores:
+        st.info("Nenhum fornecedor cadastrado.")
+        return
+
+    opcoes = {f"{f.get('name')} (ID {f.get('id')})": f.get("id") for f in fornecedores}
+    selecao = st.selectbox("Fornecedor", list(opcoes.keys()))
+    fornecedor_id = opcoes[selecao]
+
+    try:
+        plano = obter_cliente().plano_acao_fornecedor(fornecedor_id)
+    except ErroAPI as exc:
+        st.info(f"Sem plano de ação disponível para este fornecedor: {exc}")
+        return
+    except Exception as exc:
+        st.error(f"Falha ao buscar plano de ação: {exc}")
+        return
+
+    if not plano:
+        st.info("Este fornecedor não possui itens de plano de ação.")
+        return
+
+    df_plano = pd.DataFrame(plano)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.plotly_chart(px.pie(df_plano, names="pilar", title="Itens do plano por pilar ESG"), use_container_width=True)
+    with col_b:
+        st.plotly_chart(px.bar(df_plano.sort_values("importancia"), x="importancia", y="acao", orientation="h", color="pilar", title="Ações por importância"), use_container_width=True)
+
+    st.subheader("Detalhamento das ações")
+    st.dataframe(df_plano, use_container_width=True, hide_index=True)
 
 
 def render_classificacao() -> None:
@@ -1089,6 +1131,8 @@ def app() -> None:
         render_dashboard_ml()
     elif pagina == "Fornecedores":
         render_fornecedores()
+    elif pagina == "Fornecedores e Planos de Ação":
+        render_fornecedores_planos_acao()
     elif pagina == "Importação e Classificação em Lote":
         render_importacao_lote()
     elif pagina == "Classificação e Explicabilidade":

@@ -66,6 +66,14 @@ class ClienteApiESG:
         )
         return self._tratar(resposta)
 
+    def plano_acao_fornecedor(self, fornecedor_id: int) -> list[dict[str, Any]]:
+        resposta = requests.get(
+            f"{self.url_base}/fornecedores/{fornecedor_id}/plano-acao",
+            headers=self.cabecalhos,
+            timeout=self.timeout,
+        )
+        return self._tratar(resposta)
+
     def classificar(self, fornecedor: dict[str, Any]) -> dict[str, Any]:
         resposta = requests.post(
             f"{self.url_base}/classificar", json=fornecedor, headers=self.cabecalhos, timeout=self.timeout
