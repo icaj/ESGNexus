@@ -277,18 +277,18 @@ def _criar_log_alteracoes_fornecedores() -> None:
             BEGIN
                 IF TG_OP = 'INSERT' THEN
                     INSERT INTO log_alteracoes_fornecedores
-                        (fornecedor_id, operacao, dados_novos, usuario_bd)
-                    VALUES (NEW.id, 'INSERT', row_to_json(NEW)::TEXT, current_user);
+                        (data_hora, fornecedor_id, operacao, dados_novos, usuario_bd)
+                    VALUES (NOW(), NEW.id, 'INSERT', row_to_json(NEW)::TEXT, current_user);
                     RETURN NEW;
                 ELSIF TG_OP = 'UPDATE' THEN
                     INSERT INTO log_alteracoes_fornecedores
-                        (fornecedor_id, operacao, dados_anteriores, dados_novos, usuario_bd)
-                    VALUES (OLD.id, 'UPDATE', row_to_json(OLD)::TEXT, row_to_json(NEW)::TEXT, current_user);
+                        (data_hora, fornecedor_id, operacao, dados_anteriores, dados_novos, usuario_bd)
+                    VALUES (NOW(), OLD.id, 'UPDATE', row_to_json(OLD)::TEXT, row_to_json(NEW)::TEXT, current_user);
                     RETURN NEW;
                 ELSIF TG_OP = 'DELETE' THEN
                     INSERT INTO log_alteracoes_fornecedores
-                        (fornecedor_id, operacao, dados_anteriores, usuario_bd)
-                    VALUES (OLD.id, 'DELETE', row_to_json(OLD)::TEXT, current_user);
+                        (data_hora, fornecedor_id, operacao, dados_anteriores, usuario_bd)
+                    VALUES (NOW(), OLD.id, 'DELETE', row_to_json(OLD)::TEXT, current_user);
                     RETURN OLD;
                 END IF;
                 RETURN NULL;
