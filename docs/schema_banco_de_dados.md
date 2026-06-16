@@ -315,6 +315,387 @@ ORDER BY score_medio DESC;
 
 ---
 
+---
+
+## Dashboard Estatístico — Consultas SQL
+
+Endpoint: `GET /dashboard/estatistico`  
+Arquivo backend: `esg_ml/interfaces/api/rotas_enterprise.py` — função `dashboard_estatistico()` (linha ≈ 851)  
+Arquivo frontend: `frontend/frontend/app.py` — função `render_dashboard_estatistico()`  
+Cliente API: `frontend/frontend/cliente_api.py` — método `dashboard_estatistico()`
+
+O endpoint aceita 4 parâmetros opcionais de filtro via query string:
+
+| Parâmetro | Tipo | Exemplo | Efeito |
+|-----------|------|---------|--------|
+| `data_inicio` | `YYYY-MM-DD` | `2025-01-01` | `criado_em >= data_inicio` |
+| `data_fim` | `YYYY-MM-DD` | `2025-12-31` | `criado_em <= data_fim 23:59:59` |
+| `setor` | `string` | `Technology` | `industry = setor` |
+| `maturidade` | `string` | `High` | `maturidade_rf = maturidade` |
+
+Os filtros são compostos com `AND` quando mais de um é informado. Todas as queries abaixo assumem que os filtros opcionais podem ser acrescentados na cláusula `WHERE`.
+
+---
+
+### Q-1 · Setores disponíveis (filtro dinâmico do frontend)
+
+**Usado em:** `sessao.query(AvaliacaoBanco.industry).distinct().all()`  
+**Propósito:** Popular o selectbox "Setor" na tela do dashboard sem depender de tabela de domínio.  
+**Saída da API:** campo `setores_disponiveis` (sempre retornado sem filtro de setor).
+
+```sql
+SELECT DISTINCT industry AS setor
+FROM   avaliacoes_esg
+ORDER  BY industry;
+```
+
+---
+
+### Q-2 · Query principal — avaliações com filtros
+
+**Usado em:** `sessao.query(AvaliacaoBanco)` com `.filter()` encadeados  
+**Propósito:** Base de dados carregada em memória (DataFrame pandas) que alimenta todos os cálculos subsequentes.  
+**Saída da API:** campo `registros_detalhe` (subconjunto das colunas, para box plot e tabela detalhada).
+
+```sql
+SELECT *
+FROM   avaliacoes_esg
+WHERE  criado_em   >= :data_inicio    -- se informado
+  AND  criado_em   <= :data_fim       -- se informado  (+ ' 23:59:59')
+  AND  industry     = :setor          -- se informado
+  AND  maturidade_rf = :maturidade;  -- se informado
+```
+
+**Colunas derivadas calculadas em Python** (após o SELECT, não enviadas ao banco):
+
+```sql
+-- Nível de risco  →  _nivel_risco() em rotas_enterprise.py linha ≈ 100
+CASE
+    WHEN risco > 60 THEN 'alto'
+    WHEN risco > 30 THEN 'medio'
+    ELSE                 'baixo'
+END AS nivel_risco,
+
+-- Scores convertidos para escala 0–100
+ROUND((score_ponderado  / 10.0)::NUMERIC, 2) AS pontuacao_esg,
+ROUND((environment_score/ 10.0)::NUMERIC, 2) AS ambiental,
+ROUND((social_score     / 10.0)::NUMERIC, 2) AS social,
+ROUND((governance_score / 10.0)::NUMERIC, 2) AS governanca,
+
+-- Período mensal para série temporal
+TO_CHAR(criado_em, 'YYYY-MM') AS periodo
+```
+
+---
+
+### Q-3 · KPIs resumidos
+
+**Usado em:** bloco `kpis = {...}` da função `dashboard_estatistico()`  
+**Propósito:** Alimentar os 5 cards de indicadores no topo da tela.  
+**Saída da API:** campo `kpis`.
+
+```sql
+SELECT
+    COUNT(*)                                                          AS total_avaliacoes,
+    COUNT(DISTINCT fornecedor_id)                                     AS total_fornecedores,
+    COUNT(DISTINCT industry)                                          AS total_setores,
+    ROUND(AVG(score_ponderado / 10.0)::NUMERIC, 2)                   AS score_medio,
+    ROUND(AVG(risco)::NUMERIC, 2)                                     AS risco_medio,
+    ROUND(
+        100.0 * SUM(CASE WHEN risco > 60 THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(*), 0), 1
+    )                                                                 AS percentual_alto_risco,
+    ROUND(
+        100.0 * SUM(CASE WHEN maturidade_rf = 'High' THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(*), 0), 1
+    )                                                                 AS percentual_maturidade_high
+FROM avaliacoes_esg
+[WHERE <filtros>];
+```
+
+---
+
+### Q-4 · Estatísticas descritivas por pilar (tabela + Gráficos 1 e 4)
+
+**Usado em:** função `_stats()` interna, chamada para cada variável  
+**Propósito:** Preencher a tabela de estatísticas descritivas e os gráficos:
+- **Gráfico 1** (box plot) — mediana, Q1, Q3, outliers
+- **Gráfico 4** (radar) — comparativo média × mediana  
+**Saída da API:** campo `estatisticas` com subchaves `ambiental`, `social`, `governanca`, `total_esg`, `risco`.
+
+```sql
+-- Executado para cada variável: ambiental, social, governança, score ESG ponderado, risco
+-- Exemplo para pilar Ambiental (environment_score / 10.0)
+
+SELECT
+    AVG(environment_score / 10.0)                                         AS media,
+    PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY environment_score / 10.0)
+                                                                          AS mediana,
+    MODE()                WITHIN GROUP (ORDER BY
+        ROUND((environment_score / 10.0)::NUMERIC, 2))                   AS moda,
+    VAR_SAMP(environment_score / 10.0)                                    AS variancia,
+    STDDEV_SAMP(environment_score / 10.0)                                 AS desvio_padrao,
+    MIN(environment_score / 10.0)                                         AS minimo,
+    MAX(environment_score / 10.0)                                         AS maximo,
+    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY environment_score / 10.0) AS q1,
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY environment_score / 10.0) AS q3,
+    COUNT(*)                                                               AS total
+FROM avaliacoes_esg
+[WHERE <filtros>];
+
+-- Repetir substituindo a expressão por:
+--   social_score      / 10.0   →  Social
+--   governance_score  / 10.0   →  Governança
+--   score_ponderado   / 10.0   →  Score ESG Ponderado
+--   risco                      →  Risco
+```
+
+> **Implementação:** pandas usa `.mean()`, `.median()`, `.mode()`, `.var()`, `.std()`, `.min()`, `.max()`, `.quantile(0.25/0.75)`. O equivalente SQL padrão PostgreSQL usa `AVG`, `PERCENTILE_CONT`, `MODE()`, `VAR_SAMP`, `STDDEV_SAMP`, `MIN`, `MAX`.
+
+---
+
+### Q-5 · Distribuição por nível de risco (Gráfico 6 — pizza)
+
+**Usado em:** `df.groupby('nivel_risco').size()` (onde `nivel_risco` é coluna derivada)  
+**Propósito:** Gráfico 6 — pizza/donut com proporção de avaliações por categoria de risco.  
+**Saída da API:** campo `distribuicao_risco`.
+
+```sql
+SELECT
+    CASE
+        WHEN risco > 60 THEN 'alto'
+        WHEN risco > 30 THEN 'medio'
+        ELSE                 'baixo'
+    END                                                              AS nivel_risco,
+    COUNT(*)                                                         AS quantidade,
+    ROUND(
+        100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1
+    )                                                                AS percentual
+FROM avaliacoes_esg
+[WHERE <filtros>]
+GROUP BY 1
+ORDER BY 1;
+```
+
+---
+
+### Q-6 · Distribuição por maturidade do modelo RF
+
+**Usado em:** `df.groupby('maturidade_rf').size()`  
+**Propósito:** Gráfico bônus de maturidade (exibido na seção expandida de dados).  
+**Saída da API:** campo `distribuicao_maturidade`.
+
+```sql
+SELECT
+    maturidade_rf,
+    COUNT(*)                                                         AS quantidade,
+    ROUND(
+        100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1
+    )                                                                AS percentual
+FROM avaliacoes_esg
+[WHERE <filtros>]
+GROUP BY maturidade_rf
+ORDER BY maturidade_rf;
+```
+
+---
+
+### Q-7 · Distribuição por grade ESG
+
+**Usado em:** `df.groupby('grade').size().sort_values('grade')`  
+**Propósito:** Gráfico de barras complementar (seção bônus) — frequência de cada conceito (A, B, C…).  
+**Saída da API:** campo `distribuicao_grade`.
+
+```sql
+SELECT
+    grade,
+    COUNT(*) AS quantidade
+FROM avaliacoes_esg
+[WHERE <filtros>]
+GROUP BY grade
+ORDER BY grade;
+```
+
+---
+
+### Q-8 · Score médio e desvio padrão por setor (Gráfico 5 — barras com erro)
+
+**Usado em:** `df.groupby('industry').agg(total, score_medio, risco_medio, desvio_padrao)`  
+**Propósito:** Gráfico 5 — barras horizontais com barra de erro representando o desvio padrão do Score ESG por setor de atividade.  
+**Saída da API:** campo `por_setor`.
+
+```sql
+SELECT
+    industry                                                          AS setor,
+    COUNT(*)                                                          AS total,
+    ROUND(AVG(score_ponderado / 10.0)::NUMERIC,        2)            AS score_medio,
+    ROUND(AVG(risco)::NUMERIC,                          2)            AS risco_medio,
+    ROUND(STDDEV_SAMP(score_ponderado / 10.0)::NUMERIC, 2)           AS desvio_padrao
+FROM avaliacoes_esg
+[WHERE <filtros>]
+GROUP BY industry
+ORDER BY score_medio DESC;
+```
+
+---
+
+### Q-9 · Série temporal por mês (Gráfico 3 — linha dupla)
+
+**Usado em:** `df.groupby('periodo').agg(total, score_medio, risco_medio)`, onde `periodo = criado_em.dt.to_period('M')`  
+**Propósito:** Gráfico 3 — linha dupla com Score ESG médio (eixo Y esq.) e Risco médio (eixo Y dir.) por mês, revelando tendências temporais.  
+**Saída da API:** campo `serie_temporal`.
+
+```sql
+SELECT
+    TO_CHAR(DATE_TRUNC('month', criado_em), 'YYYY-MM')               AS periodo,
+    COUNT(*)                                                          AS total,
+    ROUND(AVG(score_ponderado / 10.0)::NUMERIC, 2)                   AS score_medio,
+    ROUND(AVG(risco)::NUMERIC,                  2)                   AS risco_medio
+FROM avaliacoes_esg
+[WHERE <filtros>]
+GROUP BY DATE_TRUNC('month', criado_em)
+ORDER BY periodo;
+```
+
+---
+
+### Q-10 · Matriz de correlação de Pearson (Gráfico 7 — heatmap)
+
+**Usado em:** `df[cols].corr()` — pandas calcula correlação de Pearson entre pares de variáveis  
+**Propósito:** Gráfico 7 — heatmap mostrando o coeficiente de correlação (−1 a +1) entre as variáveis ESG, risco e impacto.  
+**Saída da API:** campo `correlacoes` com subchaves `labels` (lista de variáveis) e `matrix` (matriz 6×6).
+
+```sql
+-- Variáveis: Ambiental, Social, Governança, Score ESG, Risco, Impacto
+-- PostgreSQL calcula correlação de Pearson com a função CORR(y, x)
+
+SELECT
+    -- Correlações com Ambiental
+    CORR(environment_score/10.0, social_score/10.0)     AS corr_amb_social,
+    CORR(environment_score/10.0, governance_score/10.0) AS corr_amb_gov,
+    CORR(environment_score/10.0, score_ponderado/10.0)  AS corr_amb_esg,
+    CORR(environment_score/10.0, risco)                  AS corr_amb_risco,
+    CORR(environment_score/10.0, impacto)                AS corr_amb_impacto,
+
+    -- Correlações com Social
+    CORR(social_score/10.0, governance_score/10.0)      AS corr_social_gov,
+    CORR(social_score/10.0, score_ponderado/10.0)       AS corr_social_esg,
+    CORR(social_score/10.0, risco)                       AS corr_social_risco,
+    CORR(social_score/10.0, impacto)                     AS corr_social_impacto,
+
+    -- Correlações com Governança
+    CORR(governance_score/10.0, score_ponderado/10.0)   AS corr_gov_esg,
+    CORR(governance_score/10.0, risco)                   AS corr_gov_risco,
+    CORR(governance_score/10.0, impacto)                 AS corr_gov_impacto,
+
+    -- Correlações com Score ESG
+    CORR(score_ponderado/10.0, risco)                    AS corr_esg_risco,
+    CORR(score_ponderado/10.0, impacto)                  AS corr_esg_impacto,
+
+    -- Correlação Risco × Impacto
+    CORR(risco, impacto)                                 AS corr_risco_impacto
+FROM avaliacoes_esg
+[WHERE <filtros>];
+```
+
+> **Nota:** A diagonal principal da matriz sempre vale `1.0` (variável correlacionada consigo mesma). A matriz é simétrica: `corr(A, B) = corr(B, A)`.
+
+---
+
+### Q-11 · Planos de ação por pilar (Gráfico 8 — barras E/S/G)
+
+**Usado em:** `sessao.query(PlanoAcaoBanco).filter(avaliacao_id.in_(ids))` + `df_p.groupby('pilar').agg(...)`  
+**Propósito:** Gráfico 8 — barras comparando o total de ações recomendadas, score médio e importância média de feature para cada pilar ESG (E, S, G).  
+**Saída da API:** campo `planos_por_pilar`.
+
+```sql
+SELECT
+    pilar,
+    COUNT(*)              AS total,
+    AVG(score)            AS score_medio,
+    AVG(importancia)      AS importancia_media
+FROM planos_acao
+WHERE avaliacao_id IN (
+    -- IDs das avaliações retornadas pela Q-2 com os filtros ativos
+    SELECT id
+    FROM   avaliacoes_esg
+    [WHERE <filtros>]
+)
+GROUP BY pilar
+ORDER BY pilar;
+
+-- Legenda de pilar:  'E' = Ambiental · 'S' = Social · 'G' = Governança
+```
+
+---
+
+### Q-12 · Histórico de treinamentos ML (gráfico de evolução bônus)
+
+**Usado em:** `sessao.query(ExperimentoMLBanco).order_by(criado_em.asc()).all()`  
+**Propósito:** Gráfico bônus (exibido apenas quando há > 1 experimento registrado) — linha mostrando a evolução de acurácia e F1-Score dos modelos RF e KNN ao longo dos treinamentos.  
+**Saída da API:** campo `historico_ml`.
+
+```sql
+SELECT
+    nome_execucao,
+    criado_em,
+    ROUND((COALESCE(rf_acuracia,  0) * 100)::NUMERIC, 2) AS rf_acuracia_pct,
+    ROUND((COALESCE(knn_acuracia, 0) * 100)::NUMERIC, 2) AS knn_acuracia_pct,
+    ROUND((COALESCE(rf_f1_medium, 0) * 100)::NUMERIC, 2) AS rf_f1_pct,
+    ROUND((COALESCE(knn_f1_medium,0) * 100)::NUMERIC, 2) AS knn_f1_pct
+FROM experimentos_ml
+ORDER BY criado_em ASC;
+```
+
+---
+
+### Resumo — Fluxo de dados do Dashboard Estatístico
+
+```
+Browser (Streamlit)
+    │
+    │  GET /dashboard/estatistico?data_inicio=&data_fim=&setor=&maturidade=
+    ▼
+FastAPI  →  dashboard_estatistico()
+    │        esg_ml/interfaces/api/rotas_enterprise.py  linha ≈ 851
+    │
+    ├── Q-1  SELECT DISTINCT industry              →  setores_disponiveis
+    ├── Q-2  SELECT * FROM avaliacoes_esg [WHERE]  →  DataFrame pandas (base)
+    │         ├── Q-3  KPIs (.mean, .nunique...)   →  kpis
+    │         ├── Q-4  _stats() por pilar          →  estatisticas
+    │         ├── Q-5  .groupby('nivel_risco')     →  distribuicao_risco
+    │         ├── Q-6  .groupby('maturidade_rf')   →  distribuicao_maturidade
+    │         ├── Q-7  .groupby('grade')           →  distribuicao_grade
+    │         ├── Q-8  .groupby('industry').agg()  →  por_setor
+    │         ├── Q-9  .groupby('periodo').agg()   →  serie_temporal
+    │         ├── Q-10 df[cols].corr()             →  correlacoes
+    │         └── coluna 'registros_detalhe'       →  registros_detalhe
+    │
+    ├── Q-11 SELECT FROM planos_acao WHERE avaliacao_id IN (...)  →  planos_por_pilar
+    └── Q-12 SELECT FROM experimentos_ml ORDER BY criado_em       →  historico_ml
+    │
+    └──►  JSON response  →  ClienteApiESG.dashboard_estatistico()
+                              frontend/frontend/cliente_api.py
+                                  │
+                                  ▼
+                          render_dashboard_estatistico()
+                          frontend/frontend/app.py
+                              │
+                              ├── KPI cards          (kpis)
+                              ├── Tabela descritiva  (estatisticas)
+                              ├── Gráfico 1 Box Plot (registros_detalhe → pd.melt)
+                              ├── Gráfico 2 Histog.  (registros_detalhe.pontuacao_esg)
+                              ├── Gráfico 3 Linha    (serie_temporal)
+                              ├── Gráfico 4 Radar    (estatisticas)
+                              ├── Gráfico 5 Barras   (por_setor)
+                              ├── Gráfico 6 Pizza    (distribuicao_risco)
+                              ├── Gráfico 7 Heatmap  (correlacoes)
+                              ├── Gráfico 8 Barras   (planos_por_pilar)
+                              └── Bônus ML           (historico_ml)
+```
+
+---
+
 ## Convenções
 
 - Todas as PKs usam `INTEGER GENERATED BY DEFAULT AS IDENTITY` (PostgreSQL nativo, sem dependência de sequências externas).
