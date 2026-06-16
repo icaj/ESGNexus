@@ -124,7 +124,7 @@ def _criar_view_fornecedores_classificacoes() -> None:
                 a.id                        AS avaliacao_id,
                 a.total_score,
                 a.score_ponderado,
-                ROUND(a.score_ponderado / 10.0, 1)  AS pontuacao_esg,
+                ROUND((a.score_ponderado / 10.0)::NUMERIC, 1)  AS pontuacao_esg,
                 a.grade,
                 a.level,
                 a.risco,
