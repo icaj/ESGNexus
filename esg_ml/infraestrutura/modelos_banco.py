@@ -7,14 +7,14 @@
 #   FornecedorBanco (1) ──< PlanoAcaoBanco  (atalho direto para plano atual)
 
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Identity, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from esg_ml.infraestrutura.banco_dados import Base
 
 
 class UsuarioBanco(Base):
     __tablename__ = 'usuarios'
-    id:          Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    id:          Mapped[int]      = mapped_column(Integer, Identity(always=False), primary_key=True, index=True)
     nome:        Mapped[str]      = mapped_column(String(120), nullable=False)
     email:       Mapped[str]      = mapped_column(String(180), nullable=False, unique=True, index=True)
     senha_hash:  Mapped[str]      = mapped_column(String(255), nullable=False)
@@ -36,7 +36,7 @@ class FornecedorBanco(Base):
     __tablename__ = 'fornecedores'
 
     # ── Identificação ─────────────────────────────────────────────────────
-    id:                Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    id:                Mapped[int]      = mapped_column(Integer, Identity(always=False), primary_key=True, index=True)
     name:              Mapped[str]      = mapped_column(String(220), nullable=False, index=True)
     industry:          Mapped[str]      = mapped_column(String(100), nullable=False)
 
@@ -80,7 +80,7 @@ class AvaliacaoBanco(Base):
     """
     __tablename__ = 'avaliacoes_esg'
 
-    id:                    Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    id:                    Mapped[int]      = mapped_column(Integer, Identity(always=False), primary_key=True, index=True)
 
     # ── FK para histórico por fornecedor ──────────────────────────────────
     fornecedor_id:         Mapped[int | None] = mapped_column(Integer,
@@ -143,7 +143,7 @@ class PlanoAcaoBanco(Base):
     """
     __tablename__ = 'planos_acao'
 
-    id:            Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    id:            Mapped[int]      = mapped_column(Integer, Identity(always=False), primary_key=True, index=True)
     avaliacao_id:  Mapped[int]      = mapped_column(Integer,
                                                      ForeignKey('avaliacoes_esg.id', ondelete='CASCADE'),
                                                      nullable=False, index=True)
@@ -168,7 +168,7 @@ class PlanoAcaoBanco(Base):
 
 class ExperimentoMLBanco(Base):
     __tablename__ = 'experimentos_ml'
-    id:              Mapped[int]         = mapped_column(Integer, primary_key=True)
+    id:              Mapped[int]         = mapped_column(Integer, Identity(always=False), primary_key=True)
     nome_execucao:   Mapped[str]         = mapped_column(String(120), nullable=False)
     knn_acuracia:    Mapped[float]       = mapped_column(Float, default=0)
     knn_f1_medium:   Mapped[float]       = mapped_column(Float, default=0)

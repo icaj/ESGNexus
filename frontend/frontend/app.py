@@ -209,11 +209,11 @@ def gerar_excel_resultado(df_resultado: pd.DataFrame, df_erros: pd.DataFrame | N
 
 def paginas_permitidas(perfil: str) -> list[str]:
     mapa = {
-        "administrador": ["Dashboard Executivo ESG", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade", "Dashboard de Machine Learning", "Operação ML/Airflow/MLflow"],
-        "gerente_esg": ["Dashboard Executivo ESG", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
-        "analista_esg": ["Dashboard Executivo ESG", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
-        "operador_esg": ["Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
-        "cientista_dados": ["Dashboard de Machine Learning", "Classificação e Explicabilidade", "Operação ML/Airflow/MLflow"],
+        "administrador":   ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade", "Dashboard de Machine Learning", "Operação ML/Airflow/MLflow"],
+        "gerente_esg":     ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
+        "analista_esg":    ["Dashboard Executivo ESG", "Dashboard Estatístico", "Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
+        "operador_esg":    ["Importação e Classificação em Lote", "Fornecedores", "Classificação e Explicabilidade"],
+        "cientista_dados": ["Dashboard Estatístico", "Dashboard de Machine Learning", "Classificação e Explicabilidade", "Operação ML/Airflow/MLflow"],
     }
     return mapa.get(perfil, ["Dashboard Executivo ESG"])
 
@@ -352,6 +352,105 @@ def render_dashboard_executivo() -> None:
             st.plotly_chart(px.bar(melhores, x="pontuacao_esg", y="razao_social", orientation="h", title="Ranking por score ESG"), use_container_width=True)
             st.dataframe(melhores, use_container_width=True, hide_index=True)
 
+    # ── Visão consolidada via view ────────────────────────────────────────────
+    st.divider()
+    st.subheader("Fornecedores — Classificações e Planos de Ação")
+
+    classificacoes = pd.DataFrame(payload.get("fornecedores_classificacoes", []))
+    if classificacoes.empty:
+        st.info("Nenhum dado disponível. Classifique fornecedores para visualizar esta seção.")
+    else:
+        tab_cls, tab_planos = st.tabs(["Classificações", "Planos de Ação"])
+
+        with tab_cls:
+            _COLS_RESUMO = [
+                "razao_social", "setor", "cnpj", "pontuacao_esg", "grade", "level",
+                "risco", "impacto", "quadrante", "maturidade_rf", "confianca_rf_high",
+                "maturidade_knn", "avaliacao_criado_em",
+            ]
+            cols_presentes = [c for c in _COLS_RESUMO if c in classificacoes.columns]
+            resumo = (
+                classificacoes
+                .drop_duplicates(subset=["fornecedor_id"])
+                [cols_presentes]
+                .sort_values("risco", ascending=False)
+                .reset_index(drop=True)
+            )
+
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                if {"pontuacao_esg", "risco", "maturidade_rf", "razao_social"}.issubset(resumo.columns):
+                    st.plotly_chart(
+                        px.scatter(
+                            resumo,
+                            x="pontuacao_esg", y="risco",
+                            color="maturidade_rf", text="razao_social",
+                            labels={"pontuacao_esg": "Score ESG (0-100)", "risco": "Risco"},
+                            title="Score ESG × Risco por fornecedor",
+                        ),
+                        use_container_width=True,
+                    )
+            with col_g2:
+                if {"risco", "razao_social", "maturidade_rf"}.issubset(resumo.columns):
+                    st.plotly_chart(
+                        px.bar(
+                            resumo.head(15),
+                            x="risco", y="razao_social", orientation="h",
+                            color="maturidade_rf",
+                            labels={"risco": "Índice de risco", "razao_social": "Fornecedor"},
+                            title="Top 15 fornecedores por risco",
+                        ),
+                        use_container_width=True,
+                    )
+
+            st.dataframe(resumo, use_container_width=True, hide_index=True)
+
+        with tab_planos:
+            _COLS_PLANO = ["razao_social", "setor", "pilar", "pilar_score", "importancia", "acao"]
+            cols_plano = [c for c in _COLS_PLANO if c in classificacoes.columns]
+            planos = (
+                classificacoes
+                .dropna(subset=["plano_id"] if "plano_id" in classificacoes.columns else [])
+                [cols_plano]
+                .sort_values(
+                    ["razao_social", "importancia"] if "importancia" in cols_plano else ["razao_social"],
+                    ascending=[True, False],
+                )
+                .reset_index(drop=True)
+            )
+
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                if "pilar" in planos.columns and not planos.empty:
+                    dist_pilar = (
+                        planos.groupby("pilar", as_index=False)
+                        .size()
+                        .rename(columns={"size": "total"})
+                    )
+                    _CORES_PILAR = {"E": "#2ECC71", "S": "#3498DB", "G": "#9B59B6"}
+                    st.plotly_chart(
+                        px.pie(
+                            dist_pilar, names="pilar", values="total",
+                            color="pilar", color_discrete_map=_CORES_PILAR,
+                            hole=0.4, title="Itens de plano por pilar ESG",
+                        ),
+                        use_container_width=True,
+                    )
+            with col_p2:
+                if {"pilar", "pilar_score"}.issubset(planos.columns) and not planos.empty:
+                    _CORES_PILAR = {"E": "#2ECC71", "S": "#3498DB", "G": "#9B59B6"}
+                    st.plotly_chart(
+                        px.box(
+                            planos, x="pilar", y="pilar_score",
+                            color="pilar", color_discrete_map=_CORES_PILAR,
+                            labels={"pilar_score": "Score do pilar (0-1000)", "pilar": "Pilar"},
+                            title="Distribuição de score por pilar",
+                        ),
+                        use_container_width=True,
+                    )
+
+            st.dataframe(planos, use_container_width=True, hide_index=True)
+
 
 def render_dashboard_ml() -> None:
     st.header("Dashboard de Machine Learning")
@@ -361,30 +460,113 @@ def render_dashboard_ml() -> None:
     except Exception as exc:
         st.error(f"Não foi possível carregar os dados de ML. Verifique perfil de acesso ou API: {exc}")
         return
-    metricas = payload.get("metricas", {})
+
+    metricas    = payload.get("metricas", {})
+    experimento = payload.get("experimento")
+
+    # ── Contexto do treinamento ───────────────────────────────────────────────
+    if experimento:
+        data_treino = (experimento.get("criado_em") or "")[:10]
+        st.caption(f"Treinamento mais recente: **{experimento.get('nome', '-')}** · {data_treino}")
+    else:
+        st.warning("Nenhum treinamento registrado no banco. Execute `treinar_modelo.py` ou `POST /treinar`.")
+
+    # ── Métricas do Random Forest (treinamento mais recente) ──────────────────
+    def _fmt(v) -> str:
+        return f"{float(v):.1f}%" if v is not None and v != 0 else "—"
+
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Accuracy", metricas.get("accuracy", 0))
-    col2.metric("Precision", metricas.get("precision", 0))
-    col3.metric("Recall", metricas.get("recall", 0))
-    col4.metric("F1 Score", metricas.get("f1", 0))
+    col1.metric("Accuracy",  _fmt(metricas.get("accuracy")))
+    col2.metric("Precision", _fmt(metricas.get("precision")))
+    col3.metric("Recall",    _fmt(metricas.get("recall")))
+    col4.metric("F1 Score",  _fmt(metricas.get("f1")))
+
+    # ── Comparativo RF × KNN ──────────────────────────────────────────────────
+    if experimento:
+        st.divider()
+        st.subheader("Comparativo Random Forest × KNN")
+
+        rf  = experimento.get("rf",  {})
+        knn = experimento.get("knn", {})
+
+        _METRICAS_COMP = ["acuracia", "precision", "recall", "f1"]
+        _LABELS_COMP   = {"acuracia": "Acurácia", "precision": "Precisão",
+                          "recall": "Recall", "f1": "F1 Score"}
+
+        df_comp = pd.DataFrame([
+            {
+                "Modelo":   modelo,
+                **{_LABELS_COMP[m]: (f"{dados.get(m):.1f}%" if dados.get(m) is not None else "—")
+                   for m in _METRICAS_COMP},
+            }
+            for modelo, dados in [("Random Forest", rf), ("KNN", knn)]
+        ])
+        st.dataframe(df_comp, use_container_width=True, hide_index=True)
+
+        col_r, col_k = st.columns(2)
+        categorias = ["Acurácia", "Precisão", "Recall", "F1 Score"]
+        with col_r:
+            fig_radar = go.Figure()
+            for nome, dados in [("Random Forest", rf), ("KNN", knn)]:
+                valores = [dados.get(k) or 0 for k in _METRICAS_COMP]
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=valores, theta=categorias, fill="toself", name=nome,
+                ))
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                title="Radar de métricas — RF × KNN",
+                legend=dict(orientation="h", y=-0.15),
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        with col_k:
+            df_bar = pd.DataFrame([
+                {"Métrica": _LABELS_COMP[m], "Random Forest": rf.get(m) or 0,
+                 "KNN": knn.get(m) or 0}
+                for m in _METRICAS_COMP
+            ])
+            fig_bar = px.bar(
+                df_bar.melt(id_vars="Métrica", var_name="Modelo", value_name="Valor (%)"),
+                x="Métrica", y="Valor (%)", color="Modelo", barmode="group",
+                range_y=[0, 105], title="Métricas por modelo (%)",
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    # ── Gráficos de comportamento do modelo ───────────────────────────────────
+    st.divider()
     col_a, col_b = st.columns(2)
     scores = pd.DataFrame(payload.get("distribuicao_scores", []))
     if not scores.empty:
         with col_a:
-            st.plotly_chart(px.histogram(scores, x="pontuacao_esg", color="nivel_risco", nbins=20, title="Distribuição dos scores ESG"), use_container_width=True)
+            st.plotly_chart(px.histogram(scores, x="pontuacao_esg", color="nivel_risco",
+                                         nbins=20, title="Distribuição dos scores ESG"),
+                            use_container_width=True)
     dispersao = pd.DataFrame(payload.get("dispersao", []))
     if not dispersao.empty:
         with col_b:
-            st.plotly_chart(px.scatter(dispersao, x="pontuacao_esg", y="probabilidade_ml_alto_risco", color="nivel_risco", size="pontuacao_governanca", title="Score ESG x Probabilidade de alto risco"), use_container_width=True)
+            st.plotly_chart(px.scatter(dispersao, x="pontuacao_esg",
+                                       y="probabilidade_ml_alto_risco",
+                                       color="nivel_risco", size="pontuacao_governanca",
+                                       title="Score ESG × Probabilidade de alto risco"),
+                            use_container_width=True)
+
     col_c, col_d = st.columns(2)
     importancia = pd.DataFrame(payload.get("feature_importance", []))
     if not importancia.empty:
         with col_c:
-            st.plotly_chart(px.bar(importancia.sort_values("importancia"), x="importancia", y="variavel", orientation="h", title="Importância das variáveis"), use_container_width=True)
+            st.plotly_chart(px.bar(importancia.sort_values("importancia"),
+                                   x="importancia", y="variavel", orientation="h",
+                                   title="Importância das variáveis"),
+                            use_container_width=True)
     if not dispersao.empty:
         with col_d:
-            correlacao = dispersao[["pontuacao_esg", "probabilidade_ml_alto_risco", "pontuacao_ambiental", "pontuacao_social", "pontuacao_governanca"]].corr()
-            st.plotly_chart(px.imshow(correlacao, text_auto=True, title="Correlação entre variáveis ESG e ML"), use_container_width=True)
+            correlacao = dispersao[["pontuacao_esg", "probabilidade_ml_alto_risco",
+                                    "pontuacao_ambiental", "pontuacao_social",
+                                    "pontuacao_governanca"]].corr()
+            st.plotly_chart(px.imshow(correlacao, text_auto=True,
+                                      title="Correlação entre variáveis ESG e ML"),
+                            use_container_width=True)
+
     st.subheader("Amostra analisada pelo modelo")
     if not scores.empty:
         st.dataframe(scores, use_container_width=True, hide_index=True)
@@ -546,6 +728,316 @@ def render_importacao_lote() -> None:
             st.write(f"- {motivo}")
 
 
+def render_dashboard_estatistico() -> None:
+    st.title("Dashboard Estatístico")
+    st.caption("Análise estatística dos dados do banco de dados ESG Nexus — médias, distribuições, correlações e tendências.")
+
+    # ── Filtros ────────────────────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns([2, 2, 3, 2])
+    with col1:
+        dt_inicio = st.date_input("Data inicial", value=None, key="est_di")
+    with col2:
+        dt_fim = st.date_input("Data final", value=None, key="est_df")
+    with col3:
+        setores_disp = st.session_state.get("est_setores", [])
+        setor = st.selectbox(
+            "Setor", [None] + setores_disp,
+            format_func=lambda x: "Todos os setores" if x is None else x,
+            key="est_setor",
+        )
+    with col4:
+        maturidade = st.selectbox(
+            "Maturidade RF", [None, "High", "Medium", "Low"],
+            format_func=lambda x: "Todas" if x is None else x,
+            key="est_mat",
+        )
+
+    # ── Buscar dados ───────────────────────────────────────────────────────────
+    try:
+        dados = obter_cliente().dashboard_estatistico(
+            data_inicio=str(dt_inicio) if dt_inicio else None,
+            data_fim=str(dt_fim) if dt_fim else None,
+            setor=setor,
+            maturidade=maturidade,
+        )
+    except ErroAPI as exc:
+        st.error(f"Erro ao carregar dados estatísticos: {exc}")
+        return
+
+    st.session_state["est_setores"] = dados.get("setores_disponiveis", [])
+
+    kpis = dados.get("kpis", {})
+    if not kpis:
+        st.info("Nenhuma avaliação encontrada para os filtros selecionados.")
+        return
+
+    # ── KPIs ───────────────────────────────────────────────────────────────────
+    st.markdown("### Indicadores Resumidos")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Total de Avaliações", kpis.get("total_avaliacoes", 0))
+    c2.metric("Fornecedores", kpis.get("total_fornecedores", 0))
+    c3.metric("Score ESG Médio", f"{kpis.get('score_medio', 0):.2f}")
+    c4.metric("% Alto Risco", f"{kpis.get('percentual_alto_risco', 0):.1f}%")
+    c5.metric("% Maturidade High", f"{kpis.get('percentual_maturidade_high', 0):.1f}%")
+
+    # ── Tabela de estatísticas descritivas ─────────────────────────────────────
+    st.markdown("### Estatísticas Descritivas por Pilar")
+    st.caption("Média, mediana, moda, desvio padrão, variância, mínimo, máximo e quartis.")
+    estatisticas = dados.get("estatisticas", {})
+    _labels_est = {
+        "ambiental":  "Ambiental (0–100)",
+        "social":     "Social (0–100)",
+        "governanca": "Governança (0–100)",
+        "total_esg":  "Score ESG Ponderado",
+        "risco":      "Risco",
+    }
+    linhas_est = []
+    for k, label in _labels_est.items():
+        s = estatisticas.get(k, {})
+        if s:
+            linhas_est.append({
+                "Variável":       label,
+                "n":              s.get("total"),
+                "Média":          s.get("media"),
+                "Mediana":        s.get("mediana"),
+                "Moda":           s.get("moda"),
+                "Desvio Padrão":  s.get("desvio_padrao"),
+                "Variância":      s.get("variancia"),
+                "Mín":            s.get("minimo"),
+                "Máx":            s.get("maximo"),
+                "Q1":             s.get("q1"),
+                "Q3":             s.get("q3"),
+            })
+    if linhas_est:
+        st.dataframe(pd.DataFrame(linhas_est), use_container_width=True, hide_index=True)
+
+    # ── Gráficos ───────────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### Gráficos Estatísticos")
+
+    registros = dados.get("registros_detalhe", [])
+    df_det = pd.DataFrame(registros) if registros else pd.DataFrame()
+
+    # Gráfico 1 + 2
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Gráfico 1 — Box Plot: Distribuição por Pilar**")
+        st.caption("Média, mediana, Q1/Q3 e outliers de cada pilar ESG.")
+        if not df_det.empty:
+            df_melt = pd.melt(
+                df_det, id_vars=["setor", "nivel_risco"],
+                value_vars=["ambiental", "social", "governanca"],
+                var_name="pilar", value_name="score",
+            )
+            df_melt["pilar"] = df_melt["pilar"].map(
+                {"ambiental": "Ambiental", "social": "Social", "governanca": "Governança"})
+            fig = px.box(
+                df_melt, x="pilar", y="score", color="pilar",
+                color_discrete_map={
+                    "Ambiental": "#2ecc71", "Social": "#3498db", "Governança": "#9b59b6"},
+                labels={"score": "Score (0–100)", "pilar": "Pilar"},
+            )
+            fig.update_layout(showlegend=False, margin=dict(t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("**Gráfico 2 — Histograma: Frequência do Score ESG**")
+        st.caption("Distribuição de frequência relativa e absoluta do Score ESG ponderado.")
+        if not df_det.empty:
+            fig = px.histogram(
+                df_det, x="pontuacao_esg", nbins=20,
+                color_discrete_sequence=["#2ecc71"],
+                labels={"pontuacao_esg": "Score ESG", "count": "Frequência"},
+            )
+            fig.update_layout(bargap=0.05, yaxis_title="Frequência", margin=dict(t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # Gráfico 3 + 4
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Gráfico 3 — Tendência Temporal: Score ESG e Risco por Mês**")
+        st.caption("Evolução do Score ESG médio (verde) e Risco médio (vermelho) ao longo do tempo.")
+        serie = dados.get("serie_temporal", [])
+        if serie:
+            df_s = pd.DataFrame(serie)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df_s["periodo"], y=df_s["score_medio"],
+                name="Score ESG Médio", mode="lines+markers",
+                line=dict(color="#2ecc71", width=2),
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_s["periodo"], y=df_s["risco_medio"],
+                name="Risco Médio", mode="lines+markers",
+                line=dict(color="#e74c3c", width=2), yaxis="y2",
+            ))
+            fig.update_layout(
+                xaxis_title="Período",
+                yaxis=dict(title="Score ESG", color="#2ecc71", side="left"),
+                yaxis2=dict(title="Risco", color="#e74c3c", side="right", overlaying="y"),
+                legend=dict(orientation="h", y=-0.25),
+                margin=dict(t=10, b=30),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Dados temporais insuficientes para o período selecionado.")
+
+    with col2:
+        st.markdown("**Gráfico 4 — Radar: Média vs Mediana por Pilar**")
+        st.caption("Comparativo entre as medidas de tendência central por pilar ESG.")
+        if estatisticas:
+            _pilares = ["Ambiental", "Social", "Governança"]
+            _keys    = ["ambiental", "social", "governanca"]
+            medias   = [estatisticas.get(k, {}).get("media",   0) or 0 for k in _keys]
+            medianas = [estatisticas.get(k, {}).get("mediana", 0) or 0 for k in _keys]
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(
+                r=medias + [medias[0]], theta=_pilares + [_pilares[0]],
+                fill="toself", name="Média", line_color="#2ecc71",
+            ))
+            fig.add_trace(go.Scatterpolar(
+                r=medianas + [medianas[0]], theta=_pilares + [_pilares[0]],
+                fill="toself", name="Mediana", line_color="#e67e22", opacity=0.7,
+            ))
+            fig.update_layout(
+                polar=dict(radialaxis=dict(range=[0, 100], tickfont_size=10)),
+                legend=dict(orientation="h", y=-0.15),
+                margin=dict(t=10, b=30),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    # Gráfico 5 + 6
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Gráfico 5 — Score Médio por Setor (com Desvio Padrão)**")
+        st.caption("Média e desvio padrão do Score ESG por setor de atividade econômica.")
+        por_setor = dados.get("por_setor", [])
+        if por_setor:
+            df_ps = pd.DataFrame(por_setor)
+            df_ps["desvio_padrao"] = df_ps["desvio_padrao"].fillna(0)
+            fig = go.Figure(go.Bar(
+                x=df_ps["setor"], y=df_ps["score_medio"],
+                error_y=dict(type="data", array=df_ps["desvio_padrao"].tolist(), visible=True),
+                marker_color="#2ecc71",
+                text=df_ps["score_medio"].round(1), textposition="outside",
+            ))
+            fig.update_layout(
+                xaxis_tickangle=-35,
+                xaxis_title="Setor", yaxis_title="Score ESG",
+                margin=dict(t=10, b=80),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("**Gráfico 6 — Distribuição por Nível de Risco**")
+        st.caption("Proporção de avaliações em cada nível de risco (baixo / médio / alto).")
+        dist_risco = dados.get("distribuicao_risco", [])
+        if dist_risco:
+            df_dr = pd.DataFrame(dist_risco)
+            _CORES_R = {"alto": "#e74c3c", "médio": "#f39c12", "baixo": "#2ecc71"}
+            fig = px.pie(
+                df_dr, names="nivel_risco", values="quantidade",
+                color="nivel_risco", color_discrete_map=_CORES_R, hole=0.4,
+            )
+            fig.update_traces(
+                texttemplate="<b>%{label}</b><br>%{value} (%{percent})",
+                hovertemplate="%{label}: %{value} avaliações (%{percent})<extra></extra>",
+            )
+            fig.update_layout(margin=dict(t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # Gráfico 7 + 8
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Gráfico 7 — Heatmap: Correlação entre Variáveis ESG**")
+        st.caption("Coeficiente de correlação de Pearson entre os pilares, score ponderado, risco e impacto.")
+        correlacoes = dados.get("correlacoes", {})
+        if correlacoes and correlacoes.get("labels") and correlacoes.get("matrix"):
+            fig = px.imshow(
+                correlacoes["matrix"],
+                x=correlacoes["labels"], y=correlacoes["labels"],
+                text_auto=".2f",
+                color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
+            )
+            fig.update_layout(margin=dict(t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("**Gráfico 8 — Planos de Ação por Pilar ESG**")
+        st.caption("Total de ações de melhoria recomendadas para cada pilar (E / S / G).")
+        planos = dados.get("planos_por_pilar", [])
+        if planos:
+            df_pl = pd.DataFrame(planos)
+            _CORES_P  = {"E": "#2ecc71", "S": "#3498db", "G": "#9b59b6"}
+            _LABELS_P = {"E": "Ambiental", "S": "Social", "G": "Governança"}
+            df_pl["pilar_label"] = df_pl["pilar"].map(_LABELS_P).fillna(df_pl["pilar"])
+            fig = go.Figure(go.Bar(
+                x=df_pl["pilar_label"], y=df_pl["total"],
+                marker_color=[_CORES_P.get(p, "#95a5a6") for p in df_pl["pilar"]],
+                text=df_pl["total"], textposition="outside", name="Ações",
+            ))
+            fig.update_layout(
+                xaxis_title="Pilar", yaxis_title="Nº de Ações",
+                margin=dict(t=10, b=10),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Nenhum plano de ação disponível para o filtro selecionado.")
+
+    # ── Histórico ML (quando há mais de 1 treinamento) ─────────────────────────
+    historico_ml = dados.get("historico_ml", [])
+    if len(historico_ml) > 1:
+        st.markdown("---")
+        st.markdown("**Evolução Histórica dos Modelos ML**")
+        st.caption("Acurácia (%) e F1-Score (%) de Random Forest e KNN ao longo dos treinamentos.")
+        df_ml = pd.DataFrame(historico_ml)
+        df_ml["label"] = df_ml["nome"].str.replace("treino_", "", regex=False)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df_ml["label"], y=df_ml["rf_acuracia"],
+            name="RF – Acurácia %", mode="lines+markers",
+            line=dict(color="#2ecc71", width=2),
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_ml["label"], y=df_ml["knn_acuracia"],
+            name="KNN – Acurácia %", mode="lines+markers",
+            line=dict(color="#3498db", width=2),
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_ml["label"], y=df_ml["rf_f1"],
+            name="RF – F1 %", mode="lines+markers",
+            line=dict(color="#27ae60", width=2, dash="dot"),
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_ml["label"], y=df_ml["knn_f1"],
+            name="KNN – F1 %", mode="lines+markers",
+            line=dict(color="#2980b9", width=2, dash="dot"),
+        ))
+        fig.update_layout(
+            yaxis_title="Valor (%)", xaxis_tickangle=-30,
+            legend=dict(orientation="h", y=-0.25),
+            margin=dict(t=10, b=60),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Dados detalhados ───────────────────────────────────────────────────────
+    st.markdown("---")
+    with st.expander("Dados Detalhados das Avaliações", expanded=False):
+        if not df_det.empty:
+            st.dataframe(
+                df_det.rename(columns={
+                    "setor": "Setor", "ambiental": "Ambiental", "social": "Social",
+                    "governanca": "Governança", "pontuacao_esg": "Score ESG",
+                    "risco": "Risco", "impacto": "Impacto",
+                    "nivel_risco": "Nível Risco", "maturidade_rf": "Maturidade RF",
+                    "grade": "Grade", "periodo": "Período",
+                }),
+                use_container_width=True, hide_index=True,
+            )
+        else:
+            st.info("Sem dados para exibir.")
+
+
 def render_operacao_ml() -> None:
     st.header("Operação de ML, Airflow e MLflow")
     st.markdown("<div class='painel-info'>Tela operacional para acompanhar a orquestração do pipeline, rastreamento de experimentos e artefatos do modelo.</div>", unsafe_allow_html=True)
@@ -586,6 +1078,8 @@ def app() -> None:
             st.rerun()
     if pagina == "Dashboard Executivo ESG":
         render_dashboard_executivo()
+    elif pagina == "Dashboard Estatístico":
+        render_dashboard_estatistico()
     elif pagina == "Dashboard de Machine Learning":
         render_dashboard_ml()
     elif pagina == "Fornecedores":

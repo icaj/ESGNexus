@@ -95,3 +95,22 @@ class ClienteApiESG:
     def dashboard_ml(self) -> dict[str, Any]:
         resposta = requests.get(f"{self.url_base}/dashboard/ml", headers=self.cabecalhos, timeout=self.timeout)
         return self._tratar(resposta)
+
+    def dashboard_estatistico(
+        self,
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
+        setor: str | None = None,
+        maturidade: str | None = None,
+    ) -> dict[str, Any]:
+        params = {k: v for k, v in {
+            'data_inicio': data_inicio, 'data_fim': data_fim,
+            'setor': setor, 'maturidade': maturidade,
+        }.items() if v is not None}
+        resposta = requests.get(
+            f"{self.url_base}/dashboard/estatistico",
+            params=params,
+            headers=self.cabecalhos,
+            timeout=max(self.timeout, 30),
+        )
+        return self._tratar(resposta)

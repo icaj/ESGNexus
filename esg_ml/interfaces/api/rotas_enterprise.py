@@ -666,6 +666,32 @@ def plano_acao_avaliacao(avaliacao_id: int,
     ]
 
 
+# ── Helpers de dashboard ──────────────────────────────────────────────────────
+
+def _consultar_view_classificacoes(sessao: Session) -> list[dict]:
+    """Retorna os dados de vw_fornecedores_classificacoes como lista de dicts JSON-safe."""
+    from decimal import Decimal
+    from datetime import datetime as _dt
+    from sqlalchemy import text
+
+    def _safe(v):
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        if isinstance(v, _dt):
+            return v.isoformat()
+        return v
+
+    try:
+        rows = sessao.execute(
+            text('SELECT * FROM vw_fornecedores_classificacoes')
+        ).mappings().all()
+        return [{k: _safe(v) for k, v in dict(r).items()} for r in rows]
+    except Exception:
+        return []
+
+
 # ── Dashboards ────────────────────────────────────────────────────────────────
 
 @roteador.get('/dashboard/executivo', dependencies=[Depends(obter_usuario_atual)])
@@ -685,7 +711,7 @@ def dashboard_executivo(sessao: Session = Depends(obter_sessao)) -> dict:
 
     if not registros:
         return {'kpis': {}, 'distribuicao_risco': [], 'medias_pilares': [],
-                'top_risco': [], 'melhores': []}
+                'top_risco': [], 'melhores': [], 'fornecedores_classificacoes': []}
 
     df = pd.DataFrame([{c.name: getattr(r, c.name)
                          for c in r.__table__.columns} for r in registros])
@@ -725,6 +751,7 @@ def dashboard_executivo(sessao: Session = Depends(obter_sessao)) -> dict:
             mel_df[['razao_social', 'industry', 'pontuacao_esg', 'grade', 'maturidade_rf']]
             .to_dict('records')
         ),
+        'fornecedores_classificacoes': _consultar_view_classificacoes(sessao),
     }
 
 
@@ -732,26 +759,41 @@ def dashboard_executivo(sessao: Session = Depends(obter_sessao)) -> dict:
               dependencies=[Depends(exigir_perfil('administrador', 'cientista_dados'))])
 def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
     """Dashboard de ML: métricas do modelo, dispersão e importância de features."""
-    # Métricas do modelo (DB → artefato → zeros)
-    metricas: dict = {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0, 'f1': 0.0}
+
+    def _pct(v) -> float | None:
+        return round(float(v) * 100, 2) if v is not None else None
+
+    metricas: dict   = {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0, 'f1': 0.0}
+    experimento: dict | None = None
+
     ultimo_exp = (sessao.query(ExperimentoMLBanco)
                   .order_by(ExperimentoMLBanco.criado_em.desc()).first())
+
     if ultimo_exp:
         metricas = {
-            'accuracy':  round(float(ultimo_exp.rf_acuracia), 3),
-            'precision': round(float(ultimo_exp.rf_precision if ultimo_exp.rf_precision is not None else ultimo_exp.rf_acuracia), 3),
-            'recall':    round(float(ultimo_exp.rf_recall    if ultimo_exp.rf_recall    is not None else ultimo_exp.rf_acuracia), 3),
-            'f1':        round(float(ultimo_exp.rf_f1_medium), 3),
+            'accuracy':  _pct(ultimo_exp.rf_acuracia),
+            'precision': _pct(ultimo_exp.rf_precision if ultimo_exp.rf_precision is not None
+                              else ultimo_exp.rf_acuracia),
+            'recall':    _pct(ultimo_exp.rf_recall    if ultimo_exp.rf_recall    is not None
+                              else ultimo_exp.rf_acuracia),
+            'f1':        _pct(ultimo_exp.rf_f1_medium),
         }
-    else:
-        try:
-            _, rf_meta = repositorio.carregar('modelo_rf')
-            m = rf_meta.get('metricas', {})
-            metricas = {k: round(float(v), 3)
-                        for k, v in m.items()
-                        if k in ('accuracy', 'precision', 'recall', 'f1')} or metricas
-        except Exception:
-            pass
+        experimento = {
+            'nome':      ultimo_exp.nome_execucao,
+            'criado_em': ultimo_exp.criado_em.isoformat() if ultimo_exp.criado_em else None,
+            'rf': {
+                'acuracia':  _pct(ultimo_exp.rf_acuracia),
+                'precision': _pct(ultimo_exp.rf_precision),
+                'recall':    _pct(ultimo_exp.rf_recall),
+                'f1':        _pct(ultimo_exp.rf_f1_medium),
+            },
+            'knn': {
+                'acuracia':  _pct(ultimo_exp.knn_acuracia),
+                'precision': _pct(ultimo_exp.knn_precision),
+                'recall':    _pct(ultimo_exp.knn_recall),
+                'f1':        _pct(ultimo_exp.knn_f1_medium),
+            },
+        }
 
     # Feature importance
     feature_importance: list = []
@@ -774,8 +816,9 @@ def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
 
     registros = sessao.query(AvaliacaoBanco).all()
     if not registros:
-        return {'metricas': metricas, 'distribuicao_scores': [],
-                'dispersao': [], 'feature_importance': feature_importance}
+        return {'metricas': metricas, 'experimento': experimento,
+                'distribuicao_scores': [], 'dispersao': [],
+                'feature_importance': feature_importance}
 
     df = pd.DataFrame([{c.name: getattr(r, c.name)
                          for c in r.__table__.columns} for r in registros])
@@ -790,6 +833,7 @@ def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
 
     return {
         'metricas': metricas,
+        'experimento': experimento,
         'distribuicao_scores': (
             df[['razao_social', 'pontuacao_esg', 'nivel_risco']].to_dict('records')
         ),
@@ -799,4 +843,212 @@ def dashboard_ml(sessao: Session = Depends(obter_sessao)) -> dict:
             .to_dict('records')
         ),
         'feature_importance': feature_importance,
+    }
+
+
+# ── /dashboard/estatistico ────────────────────────────────────────────────────
+
+@roteador.get('/dashboard/estatistico', dependencies=[Depends(obter_usuario_atual)])
+def dashboard_estatistico(
+    data_inicio: str | None = None,
+    data_fim:    str | None = None,
+    setor:       str | None = None,
+    maturidade:  str | None = None,
+    sessao: Session = Depends(obter_sessao),
+) -> dict:
+    """Estatísticas descritivas, distribuições, correlações e tendências dos dados do banco."""
+    import math
+
+    todos_setores = sorted({
+        r[0] for r in sessao.query(AvaliacaoBanco.industry).distinct().all()
+    })
+
+    query = sessao.query(AvaliacaoBanco)
+    if data_inicio:
+        query = query.filter(AvaliacaoBanco.criado_em >= data_inicio)
+    if data_fim:
+        query = query.filter(AvaliacaoBanco.criado_em <= data_fim + ' 23:59:59')
+    if setor:
+        query = query.filter(AvaliacaoBanco.industry == setor)
+    if maturidade:
+        query = query.filter(AvaliacaoBanco.maturidade_rf == maturidade)
+
+    registros = query.all()
+
+    _vazio = {
+        'kpis': {}, 'estatisticas': {}, 'distribuicao_risco': [],
+        'distribuicao_maturidade': [], 'distribuicao_grade': [],
+        'por_setor': [], 'serie_temporal': [], 'correlacoes': {},
+        'planos_por_pilar': [], 'historico_ml': [],
+        'registros_detalhe': [], 'setores_disponiveis': todos_setores,
+        'filtros_aplicados': {
+            'data_inicio': data_inicio, 'data_fim': data_fim,
+            'setor': setor, 'maturidade': maturidade,
+        },
+    }
+    if not registros:
+        return _vazio
+
+    def _f(v) -> float | None:
+        if v is None or (isinstance(v, float) and math.isnan(v)):
+            return None
+        return round(float(v), 3)
+
+    df = pd.DataFrame([{c.name: getattr(r, c.name)
+                         for c in r.__table__.columns} for r in registros])
+    df['nivel_risco']   = df['risco'].apply(_nivel_risco)
+    df['pontuacao_esg'] = (df['score_ponderado'] / 10.0).round(2)
+    df['env']           = (df['environment_score'] / 10.0).round(2)
+    df['soc']           = (df['social_score']      / 10.0).round(2)
+    df['gov']           = (df['governance_score']  / 10.0).round(2)
+    df['criado_em']     = pd.to_datetime(df['criado_em'], utc=True)
+    df['periodo']       = df['criado_em'].dt.to_period('M').astype(str)
+
+    total = len(df)
+
+    def _stats(s: pd.Series) -> dict:
+        s = s.dropna()
+        if s.empty:
+            return {}
+        moda_s = s.mode()
+        return {
+            'media':         _f(s.mean()),
+            'mediana':       _f(s.median()),
+            'moda':          _f(moda_s.iloc[0]) if not moda_s.empty else None,
+            'variancia':     _f(s.var()),
+            'desvio_padrao': _f(s.std()),
+            'minimo':        _f(s.min()),
+            'maximo':        _f(s.max()),
+            'q1':            _f(s.quantile(0.25)),
+            'q3':            _f(s.quantile(0.75)),
+            'total':         int(len(s)),
+        }
+
+    kpis = {
+        'total_avaliacoes':           total,
+        'total_fornecedores':         int(df['fornecedor_id'].nunique()),
+        'total_setores':              int(df['industry'].nunique()),
+        'score_medio':                _f(df['pontuacao_esg'].mean()),
+        'risco_medio':                _f(df['risco'].mean()),
+        'percentual_alto_risco':      _f((df['nivel_risco'] == 'alto').sum() / total * 100),
+        'percentual_maturidade_high': _f((df['maturidade_rf'] == 'High').sum() / total * 100),
+    }
+
+    estatisticas = {
+        'ambiental':  _stats(df['env']),
+        'social':     _stats(df['soc']),
+        'governanca': _stats(df['gov']),
+        'total_esg':  _stats(df['pontuacao_esg']),
+        'risco':      _stats(df['risco']),
+    }
+
+    _dr = df.groupby('nivel_risco', as_index=False).size().rename(columns={'size': 'quantidade'})
+    _dr['percentual'] = (_dr['quantidade'] / total * 100).round(1)
+    distribuicao_risco = _dr.to_dict('records')
+
+    _dm = df.groupby('maturidade_rf', as_index=False).size().rename(columns={'size': 'quantidade'})
+    _dm['percentual'] = (_dm['quantidade'] / total * 100).round(1)
+    distribuicao_maturidade = _dm.to_dict('records')
+
+    distribuicao_grade = (
+        df.groupby('grade', as_index=False).size()
+          .rename(columns={'size': 'quantidade'})
+          .sort_values('grade')
+          .to_dict('records')
+    )
+
+    por_setor = (
+        df.groupby('industry')
+          .agg(total=('id', 'count'),
+               score_medio=('pontuacao_esg', 'mean'),
+               risco_medio=('risco', 'mean'),
+               desvio_padrao=('pontuacao_esg', 'std'))
+          .round(2).reset_index()
+          .rename(columns={'industry': 'setor'})
+          .sort_values('score_medio', ascending=False)
+          .to_dict('records')
+    )
+
+    serie_temporal = (
+        df.groupby('periodo')
+          .agg(total=('id', 'count'),
+               score_medio=('pontuacao_esg', 'mean'),
+               risco_medio=('risco', 'mean'))
+          .round(2).reset_index()
+          .sort_values('periodo')
+          .to_dict('records')
+    )
+
+    _cols_corr = {
+        'env': 'Ambiental', 'soc': 'Social', 'gov': 'Governança',
+        'pontuacao_esg': 'Score ESG', 'risco': 'Risco', 'impacto': 'Impacto',
+    }
+    _cm = df[list(_cols_corr.keys())].corr().round(3)
+    _cm.index   = list(_cols_corr.values())
+    _cm.columns = list(_cols_corr.values())
+    correlacoes = {
+        'labels': list(_cols_corr.values()),
+        'matrix': [[_f(v) for v in row] for row in _cm.values.tolist()],
+    }
+
+    ids_avaliacao = set(int(i) for i in df['id'].tolist())
+    planos_registros = (
+        sessao.query(PlanoAcaoBanco)
+              .filter(PlanoAcaoBanco.avaliacao_id.in_(ids_avaliacao))
+              .all()
+    ) if ids_avaliacao else []
+    planos_por_pilar: list = []
+    if planos_registros:
+        df_p = pd.DataFrame([{c.name: getattr(r, c.name)
+                               for c in r.__table__.columns} for r in planos_registros])
+        planos_por_pilar = (
+            df_p.groupby('pilar')
+                .agg(total=('id', 'count'),
+                     score_medio=('score', 'mean'),
+                     importancia_media=('importancia', 'mean'))
+                .round(3).reset_index()
+                .to_dict('records')
+        )
+
+    experimentos = (sessao.query(ExperimentoMLBanco)
+                    .order_by(ExperimentoMLBanco.criado_em.asc()).all())
+    historico_ml = [
+        {
+            'nome':        e.nome_execucao,
+            'criado_em':   e.criado_em.isoformat() if e.criado_em else None,
+            'rf_acuracia': round(float(e.rf_acuracia or 0) * 100, 2),
+            'knn_acuracia': round(float(e.knn_acuracia or 0) * 100, 2),
+            'rf_f1':       round(float(e.rf_f1_medium or 0) * 100, 2),
+            'knn_f1':      round(float(e.knn_f1_medium or 0) * 100, 2),
+        }
+        for e in experimentos
+    ]
+
+    registros_detalhe = (
+        df[['industry', 'env', 'soc', 'gov', 'pontuacao_esg',
+            'risco', 'impacto', 'nivel_risco', 'maturidade_rf', 'grade', 'periodo']]
+        .rename(columns={
+            'industry': 'setor', 'env': 'ambiental',
+            'soc': 'social', 'gov': 'governanca',
+        })
+        .to_dict('records')
+    )
+
+    return {
+        'kpis':                    kpis,
+        'estatisticas':            estatisticas,
+        'distribuicao_risco':      distribuicao_risco,
+        'distribuicao_maturidade': distribuicao_maturidade,
+        'distribuicao_grade':      distribuicao_grade,
+        'por_setor':               por_setor,
+        'serie_temporal':          serie_temporal,
+        'correlacoes':             correlacoes,
+        'planos_por_pilar':        planos_por_pilar,
+        'historico_ml':            historico_ml,
+        'registros_detalhe':       registros_detalhe,
+        'setores_disponiveis':     todos_setores,
+        'filtros_aplicados': {
+            'data_inicio': data_inicio, 'data_fim': data_fim,
+            'setor': setor, 'maturidade': maturidade,
+        },
     }
