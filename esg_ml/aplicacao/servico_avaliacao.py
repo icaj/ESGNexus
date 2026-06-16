@@ -12,8 +12,13 @@ from esg_ml.infraestrutura.registro_log import obter_registrador
 registrador = obter_registrador(__name__)
 conf = Configuracoes()
 
+_cache_artefatos: tuple | None = None
+
 
 def _carregar_artefatos(repositorio: RepositorioModeloJoblib) -> tuple:
+    global _cache_artefatos
+    if _cache_artefatos is not None:
+        return _cache_artefatos
     ausentes = [n for n in ['modelo_knn','modelo_rf','config'] if not repositorio.existe(n)]
     if ausentes:
         raise FileNotFoundError(
@@ -24,7 +29,14 @@ def _carregar_artefatos(repositorio: RepositorioModeloJoblib) -> tuple:
     _,         cfg      = repositorio.carregar('config')
     knn_pack = {'modelo': knn_model, **knn_meta}
     rf_pack  = {'modelo': rf_model,  **rf_meta}
-    return knn_pack, rf_pack, cfg
+    _cache_artefatos = knn_pack, rf_pack, cfg
+    return _cache_artefatos
+
+
+def invalidar_cache_artefatos() -> None:
+    """Invalida o cache após novo treinamento."""
+    global _cache_artefatos
+    _cache_artefatos = None
 
 
 def _obter_pesos(industry: str, cfg: dict) -> PesosSetor:

@@ -227,10 +227,10 @@ def _criar_log_importacoes() -> None:
             AS $$
             BEGIN
                 INSERT INTO log_importacoes_fornecedores
-                    (fornecedor_id, razao_social, cnpj, usuario_id, usuario_email,
+                    (data_hora, fornecedor_id, razao_social, cnpj, usuario_id, usuario_email,
                      operacao, lote_id, detalhes)
                 VALUES
-                    (p_fornecedor_id, p_razao_social, p_cnpj, p_usuario_id, p_usuario_email,
+                    (NOW(), p_fornecedor_id, p_razao_social, p_cnpj, p_usuario_id, p_usuario_email,
                      p_operacao, p_lote_id, p_detalhes);
             END;
             $$

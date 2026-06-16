@@ -78,7 +78,7 @@ class ClienteApiESG:
             f"{self.url_base}/classificar/lote",
             json={"fornecedores": fornecedores},
             headers=self.cabecalhos,
-            timeout=max(self.timeout, 60),
+            timeout=max(self.timeout, 300),
         )
         return self._tratar(resposta)
 

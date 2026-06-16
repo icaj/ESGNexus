@@ -252,6 +252,7 @@ def treinar(sessao: Session = Depends(obter_sessao)) -> dict:
     """CRISP-DM Fases 2–6: treina modelos e persiste métricas no banco para o dashboard ML."""
     from datetime import datetime, timezone
     from esg_ml.aplicacao.servico_treinamento import ServicoTreinamento
+    from esg_ml.aplicacao.servico_avaliacao import invalidar_cache_artefatos
     from esg_ml.dominio.servicos.avaliacao import ModeloInsuficienteError
     try:
         resultado = ServicoTreinamento(repositorio).treinar()
@@ -259,6 +260,7 @@ def treinar(sessao: Session = Depends(obter_sessao)) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ModeloInsuficienteError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    invalidar_cache_artefatos()
 
     exp = ExperimentoMLBanco(
         nome_execucao=f"treino_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
